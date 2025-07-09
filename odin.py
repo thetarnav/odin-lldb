@@ -198,6 +198,8 @@ class UnionChildProvider:
     def update(self):
         self.children      = self.val.children
         self.variant_index = self.children[0].unsigned
+        self.is_no_nil     = detect_union_no_nil(self.val.type, self.val)
+        
         return False
 
     def num_children(self):
@@ -209,12 +211,14 @@ class UnionChildProvider:
         variant_index = index+1
         variant       = self.children[variant_index]
         name          = variant.type.GetDisplayTypeName()
-        # offset        = variant.addr.offset - value.addr.offset
-        selected      = "*" if self.variant_index == variant_index else ""
+        
+        if self.is_no_nil:
+            selected = "*" if self.variant_index == index else ""
+        else:
+            selected = "*" if self.variant_index == variant_index else ""
 
         field_name = f"{selected}v{variant_index}({name})"
-        # c = value.CreateChildAtOffset( field_name, offset, variant.GetType() )
-        c = value.CreateValueFromData( field_name, variant.data, variant.type )
+        c = value.CreateValueFromData(field_name, variant.data, variant.type)
 
         return c
 
@@ -229,19 +233,55 @@ def is_type_union(t, internal_dict):
 
     return True
 
+def detect_union_no_nil(union_type, union_value=None):
+    """
+    normal & #shared_nil union type:
+        tag: u64
+        v1:  T0
+        v2:  T1
+        ...
+    #no_nil union type:
+        tag: u64
+        v0:  T0
+        v1:  T1
+        ...
+    """
+    tag_field = union_type.GetFieldAtIndex(0)
+    first_variant = union_type.GetFieldAtIndex(1)
+
+    return (
+        tag_field is not None and tag_field.name == "tag" and
+        first_variant is not None and first_variant.name == "v0"
+    )
+
 def union_summary(value, internal_dict):
     if value.IsSynthetic():
         value = value.GetNonSyntheticValue()
 
     tag = value.GetChildAtIndex(0)
     assert(tag.name == "tag")
-    # tag = value.GetChildMemberWithName("tag")
-
-    variant_name = f"v{tag.unsigned}"
-    variant      = value.GetChildMemberWithName(variant_name)
-    # variant_type = variant.type.GetDisplayTypeName()
-
-    return f"{variant}"
+    
+    tag_value = tag.unsigned
+    
+    is_no_nil = detect_union_no_nil(value.type, value)
+    
+    if is_no_nil:
+        # For #no_nil unions, tag 0 = first variant (v0), tag 1 = second variant (v1), etc.
+        variant_name = f"v{tag_value}"
+    else:
+        # For regular unions, tag 0 = nil, tag 1 = first variant (v1), etc.
+        if tag_value == 0:
+            return "nil"
+        variant_name = f"v{tag_value}"
+    
+    try:
+        variant = value.GetChildMemberWithName(variant_name)
+        if variant and variant.IsValid():
+            return f"{variant}"
+        else:
+            return f"<invalid variant {variant_name}, tag={tag_value}, no_nil={is_no_nil}>"
+    except:
+        return f"<error accessing variant {variant_name}, tag={tag_value}, no_nil={is_no_nil}>"
 
 def __lldb_init_module(debugger, unused):
     debugger.HandleCommand(
