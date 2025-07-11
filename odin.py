@@ -1,13 +1,10 @@
 import lldb
 import math
-import logging
-
-log = logging.getLogger(__name__)
 
 def is_slice_type(t, internal_dict):
     return (t.name.startswith("[]") or t.name.startswith("[dynamic]")) and not t.name.endswith(']')
 
-def slice_summary(value, internal_dict):
+def slice_summary(value: lldb.SBValue, internal_dict) -> str:
     value  = value.GetNonSyntheticValue()
     length = value.GetChildMemberWithName("len").unsigned
     data   = value.GetChildMemberWithName("data")
@@ -65,11 +62,11 @@ class SliceChildProvider:
 def is_string_type(t, internal_dict):
     return t.name == "string"
 
-def string_summary(value, internal_dict):
+def string_summary(value: lldb.SBValue, internal_dict) -> str | None:
     pointer = value.GetChildMemberWithName("data").GetValueAsUnsigned(0)
     length = value.GetChildMemberWithName("len").GetValueAsSigned(0)
     if pointer == 0:
-        return False
+        return None
     if length == 0:
         return '""'
     error = lldb.SBError()
@@ -179,8 +176,8 @@ class MapChildProvider:
             cell_index = index >> 5;
             data_index = index & 31;
         else:
-            cell_index = index / elements_per_cell;
-            data_index = index % elements_per_cell;
+            cell_index = index / info.elements_per_cell;
+            data_index = index % info.elements_per_cell;
 
         return base + (cell_index * info.size_of_cell) + (data_index * info.size_of_type);
 
@@ -251,7 +248,7 @@ def detect_union_no_nil(union_type, union_value=None):
         first_variant is not None and first_variant.name == "v0"
     )
 
-def union_summary(value, internal_dict):
+def union_summary(value: lldb.SBValue, internal_dict) -> str:
     if value.IsSynthetic():
         value = value.GetNonSyntheticValue()
 
@@ -275,11 +272,11 @@ def union_summary(value, internal_dict):
 def is_struct_type(t, internal_dict):
     return not is_string_type(t, internal_dict) and t.type == lldb.eTypeClassStruct
 
-def struct_summary(value, internal_dict):
+def struct_summary(value: lldb.SBValue, internal_dict) -> str:
     if value.IsSynthetic():
         value = value.GetNonSyntheticValue()
     
-    output = value.type.GetDisplayTypeName()
+    output = type_display(value.type)
     output += "{"
 
     for i, field in enumerate(value.children):
@@ -292,6 +289,12 @@ def struct_summary(value, internal_dict):
 
     output += "}"
     return output
+
+def type_display(type: lldb.SBType) -> str:
+    name = type.name.replace("::", ".")
+    if type.is_pointer:   name = f"^{name}"
+    if type.is_reference: name = f"&{name}"
+    return name
 
 def __lldb_init_module(debugger, unused):
     debugger.HandleCommand("type summary add --recognizer-function --python-function odin.union_summary odin.is_type_union")
