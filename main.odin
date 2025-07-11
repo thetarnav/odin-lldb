@@ -1,6 +1,7 @@
 package main
 
 import "core:fmt"
+import "core:io"
 
 Enum :: enum {One, Two, Three}
 Foo :: struct {foo_name: string, value: int}
@@ -21,12 +22,15 @@ main :: proc () {
 	foo_bar_union_no_nil: Foo_Bar_Union_No_Nill = foo
 	foo_bar_union_shared_nil: Foo_Bar_Union_Shared_Nil = &foo
 
+	writer := io.Writer{}
+
 	fmt.println("Enum: ", enum_value)
 	fmt.println("Foo: ", foo)
 	fmt.println("Bar: ", bar)
 	fmt.println("Foo_Bar_Union: ", foo_bar_union)
 	fmt.println("Foo_Bar_Union_No_Nill: ", foo_bar_union_no_nil)
 	fmt.println("Foo_Bar_Union_Shared_Nil: ", foo_bar_union_shared_nil)
+	fmt.println("writer=", writer)
 
 	return
 }
