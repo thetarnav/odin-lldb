@@ -41,13 +41,13 @@ def get_odin_type(t: lldb.SBType) -> Odin_Type:
     
     return Odin_Type.OTHER
 
-def is_type_slice  (t: lldb.SBType, internal_dict) -> bool: return get_odin_type(t) == Odin_Type.SLICE
-def is_type_string (t: lldb.SBType, internal_dict) -> bool: return get_odin_type(t) == Odin_Type.STRING
-def is_type_map    (t: lldb.SBType, internal_dict) -> bool: return get_odin_type(t) == Odin_Type.MAP
-def is_type_struct (t: lldb.SBType, internal_dict) -> bool: return get_odin_type(t) == Odin_Type.STRUCT
-def is_type_union  (t: lldb.SBType, internal_dict) -> bool: return get_odin_type(t) == Odin_Type.UNION
+def is_type_slice  (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.SLICE
+def is_type_string (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.STRING
+def is_type_map    (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.MAP
+def is_type_struct (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.STRUCT
+def is_type_union  (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.UNION
 
-def slice_summary(value: lldb.SBValue, internal_dict) -> str:
+def slice_summary(value: lldb.SBValue, _dict) -> str:
     value  = value.GetNonSyntheticValue()
     length = value.GetChildMemberWithName("len").unsigned
     data   = value.GetChildMemberWithName("data")
@@ -99,7 +99,7 @@ class SliceChildProvider:
         offset = index * first.size
         return self.data_val.CreateChildAtOffset(f"[{index}]", offset, first.type)
 
-def string_summary(value: lldb.SBValue, internal_dict) -> str | None:
+def string_summary(value: lldb.SBValue, _dict) -> str | None:
     pointer = value.GetChildMemberWithName("data").GetValueAsUnsigned(0)
     length = value.GetChildMemberWithName("len").GetValueAsSigned(0)
     if pointer == 0:
@@ -274,7 +274,7 @@ def detect_union_no_nil(union_type, union_value=None):
         first_variant is not None and first_variant.name == "v0"
     )
 
-def union_summary(v: lldb.SBValue, internal_dict) -> str:
+def union_summary(v: lldb.SBValue, _dict) -> str:
     if v.IsSynthetic():
         v = v.GetNonSyntheticValue()
 
@@ -295,7 +295,7 @@ def union_summary(v: lldb.SBValue, internal_dict) -> str:
 
     return f"{variant}"
 
-def struct_summary(v: lldb.SBValue, internal_dict) -> str:
+def struct_summary(v: lldb.SBValue, _dict) -> str:
     if v.IsSynthetic():
         v = v.GetNonSyntheticValue()
     
