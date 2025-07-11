@@ -9,9 +9,43 @@ Repository: https://github.com/thetarnav/odin-lldb
 
 import lldb
 import math
+import enum
 
-def is_slice_type(t: lldb.SBType, internal_dict) -> bool:
-    return (t.name.startswith("[]") or t.name.startswith("[dynamic]")) and not t.name.endswith(']')
+
+class Odin_Type(enum.Enum):
+    SLICE  = "slice"
+    STRING = "string" 
+    MAP    = "map"
+    UNION  = "union"
+    STRUCT = "struct"
+    OTHER  = "other"
+
+def get_odin_type(t: lldb.SBType) -> Odin_Type:
+
+    if t.name == "string":
+        return Odin_Type.STRING
+    
+    if (t.name.startswith("[]") or t.name.startswith("[dynamic]")) and not t.name.endswith(']'):
+        return Odin_Type.SLICE
+    
+    if t.name.startswith("map["):
+        return Odin_Type.MAP
+    
+    if t.type == lldb.eTypeClassUnion:
+        tag = t.GetFieldAtIndex(0)
+        if tag and tag.IsValid() and tag.name == "tag":
+            return Odin_Type.UNION
+    
+    if t.type == lldb.eTypeClassStruct:
+        return Odin_Type.STRUCT
+    
+    return Odin_Type.OTHER
+
+def is_type_slice  (t: lldb.SBType, internal_dict) -> bool: return get_odin_type(t) == Odin_Type.SLICE
+def is_type_string (t: lldb.SBType, internal_dict) -> bool: return get_odin_type(t) == Odin_Type.STRING
+def is_type_map    (t: lldb.SBType, internal_dict) -> bool: return get_odin_type(t) == Odin_Type.MAP
+def is_type_struct (t: lldb.SBType, internal_dict) -> bool: return get_odin_type(t) == Odin_Type.STRUCT
+def is_type_union  (t: lldb.SBType, internal_dict) -> bool: return get_odin_type(t) == Odin_Type.UNION
 
 def slice_summary(value: lldb.SBValue, internal_dict) -> str:
     value  = value.GetNonSyntheticValue()
@@ -22,8 +56,6 @@ def slice_summary(value: lldb.SBValue, internal_dict) -> str:
     type_name = pointee.type.GetDisplayTypeName()
 
     return f"[{length}]{type_name}"
-
-
 
 class SliceChildProvider:
     CHUNK_COUNT = 2000
@@ -67,10 +99,6 @@ class SliceChildProvider:
         offset = index * first.size
         return self.data_val.CreateChildAtOffset(f"[{index}]", offset, first.type)
 
-
-def is_string_type(t: lldb.SBType, internal_dict) -> bool:
-    return t.name == "string"
-
 def string_summary(value: lldb.SBValue, internal_dict) -> str | None:
     pointer = value.GetChildMemberWithName("data").GetValueAsUnsigned(0)
     length = value.GetChildMemberWithName("len").GetValueAsSigned(0)
@@ -81,9 +109,6 @@ def string_summary(value: lldb.SBValue, internal_dict) -> str | None:
     error = lldb.SBError()
     string_data = value.process.ReadMemory(pointer, length, error)
     return '"{}"'.format(string_data.decode("utf-8"))
-
-def is_map_type(t: lldb.SBType, internal_dict) -> bool:
-    return t.name.startswith("map[")
 
 class MapChildProvider:
 
@@ -228,14 +253,6 @@ class UnionChildProvider:
 
         return c
 
-
-def is_type_union(t: lldb.SBType, internal_dict) -> bool:
-    if t.type != lldb.eTypeClassUnion:
-        return False
-
-    tag = t.GetFieldAtIndex(0)
-    return tag and tag.IsValid() and tag.name == "tag"
-
 def detect_union_no_nil(union_type, union_value=None):
     """
     normal & #shared_nil union type:
@@ -278,9 +295,6 @@ def union_summary(v: lldb.SBValue, internal_dict) -> str:
 
     return f"{variant}"
 
-def is_struct_type(t: lldb.SBType, internal_dict) -> bool:
-    return not is_string_type(t, internal_dict) and t.type == lldb.eTypeClassStruct
-
 def struct_summary(v: lldb.SBValue, internal_dict) -> str:
     if v.IsSynthetic():
         v = v.GetNonSyntheticValue()
@@ -305,11 +319,12 @@ def type_display(t: lldb.SBType) -> str:
     if t.is_reference: name = f"&{name}"
     return name
 
-def __lldb_init_module(debugger, unused):
-    debugger.HandleCommand("type summary add --recognizer-function --python-function odin.union_summary odin.is_type_union")
-    debugger.HandleCommand("type synth add --recognizer-function --python-class odin.UnionChildProvider odin.is_type_union")
-    debugger.HandleCommand("type summary add --recognizer-function --python-function odin.string_summary odin.is_string_type")
-    debugger.HandleCommand("type synth add --recognizer-function --python-class odin.SliceChildProvider odin.is_slice_type")
-    debugger.HandleCommand("type summary add --recognizer-function --python-function odin.slice_summary odin.is_slice_type")
-    debugger.HandleCommand("type synth add --recognizer-function --python-class odin.MapChildProvider odin.is_map_type")
-    debugger.HandleCommand("type summary add --recognizer-function --python-function odin.struct_summary odin.is_struct_type")
+
+def __lldb_init_module(debugger: lldb.SBDebugger, unused) -> None:
+    debugger.HandleCommand("type summary add --recognizer-function --python-function odin.union_summary      odin.is_type_union")
+    debugger.HandleCommand("type synth   add --recognizer-function --python-class    odin.UnionChildProvider odin.is_type_union")
+    debugger.HandleCommand("type summary add --recognizer-function --python-function odin.string_summary     odin.is_type_string")
+    debugger.HandleCommand("type synth   add --recognizer-function --python-class    odin.SliceChildProvider odin.is_type_slice")
+    debugger.HandleCommand("type summary add --recognizer-function --python-function odin.slice_summary      odin.is_type_slice")
+    debugger.HandleCommand("type synth   add --recognizer-function --python-class    odin.MapChildProvider   odin.is_type_map")
+    debugger.HandleCommand("type summary add --recognizer-function --python-function odin.struct_summary     odin.is_type_struct")
