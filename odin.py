@@ -272,6 +272,27 @@ def union_summary(value, internal_dict):
 
     return f"{variant}"
 
+def is_struct_type(t, internal_dict):
+    return not is_string_type(t, internal_dict) and t.type == lldb.eTypeClassStruct
+
+def struct_summary(value, internal_dict):
+    if value.IsSynthetic():
+        value = value.GetNonSyntheticValue()
+    
+    output = value.type.GetDisplayTypeName()
+    output += "{"
+
+    for i, field in enumerate(value.children):
+
+        # Let LLDB handle the formatting using registered formatters
+        output += field.GetSummary() or field.GetValue() or "<no value>"
+
+        if i < len(value.children) - 1:
+            output += ", "
+
+    output += "}"
+    return output
+
 def __lldb_init_module(debugger, unused):
     debugger.HandleCommand("type summary add --recognizer-function --python-function odin.union_summary odin.is_type_union")
     debugger.HandleCommand("type synth add --recognizer-function --python-class odin.UnionChildProvider odin.is_type_union")
@@ -279,3 +300,4 @@ def __lldb_init_module(debugger, unused):
     debugger.HandleCommand("type synth add --recognizer-function --python-class odin.SliceChildProvider odin.is_slice_type")
     debugger.HandleCommand("type summary add --recognizer-function --python-function odin.slice_summary odin.is_slice_type")
     debugger.HandleCommand("type synth add --recognizer-function --python-class odin.MapChildProvider odin.is_map_type")
+    debugger.HandleCommand("type summary add --recognizer-function --python-function odin.struct_summary odin.is_struct_type")
