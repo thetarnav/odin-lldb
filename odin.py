@@ -10,7 +10,7 @@ Repository: https://github.com/thetarnav/odin-lldb
 import lldb
 import math
 
-def is_slice_type(t, internal_dict):
+def is_slice_type(t: lldb.SBType, internal_dict) -> bool:
     return (t.name.startswith("[]") or t.name.startswith("[dynamic]")) and not t.name.endswith(']')
 
 def slice_summary(value: lldb.SBValue, internal_dict) -> str:
@@ -68,7 +68,7 @@ class SliceChildProvider:
         return self.data_val.CreateChildAtOffset(f"[{index}]", offset, first.type)
 
 
-def is_string_type(t, internal_dict):
+def is_string_type(t: lldb.SBType, internal_dict) -> bool:
     return t.name == "string"
 
 def string_summary(value: lldb.SBValue, internal_dict) -> str | None:
@@ -82,7 +82,7 @@ def string_summary(value: lldb.SBValue, internal_dict) -> str | None:
     string_data = value.process.ReadMemory(pointer, length, error)
     return '"{}"'.format(string_data.decode("utf-8"))
 
-def is_map_type(t, internal_dict):
+def is_map_type(t: lldb.SBType, internal_dict) -> bool:
     return t.name.startswith("map[")
 
 class MapChildProvider:
@@ -229,7 +229,7 @@ class UnionChildProvider:
         return c
 
 
-def is_type_union(t, internal_dict):
+def is_type_union(t: lldb.SBType, internal_dict) -> bool:
     if t.type != lldb.eTypeClassUnion:
         return False
 
@@ -257,52 +257,52 @@ def detect_union_no_nil(union_type, union_value=None):
         first_variant is not None and first_variant.name == "v0"
     )
 
-def union_summary(value: lldb.SBValue, internal_dict) -> str:
-    if value.IsSynthetic():
-        value = value.GetNonSyntheticValue()
+def union_summary(v: lldb.SBValue, internal_dict) -> str:
+    if v.IsSynthetic():
+        v = v.GetNonSyntheticValue()
 
-    tag = value.GetChildAtIndex(0)
+    tag = v.GetChildAtIndex(0)
     assert(tag.name == "tag")
     
     tag_value = tag.unsigned
     variant_name = f"v{tag_value}"
     
-    is_no_nil = detect_union_no_nil(value.type, value)
+    is_no_nil = detect_union_no_nil(v.type, v)
     
     if not is_no_nil and tag_value == 0:
         return "nil"
     
-    variant = value.GetChildMemberWithName(variant_name)
+    variant = v.GetChildMemberWithName(variant_name)
     if not variant.IsValid():
         return f"<invalid variant {variant_name}, tag={tag_value}, no_nil={is_no_nil}>"
 
     return f"{variant}"
 
-def is_struct_type(t, internal_dict):
+def is_struct_type(t: lldb.SBType, internal_dict) -> bool:
     return not is_string_type(t, internal_dict) and t.type == lldb.eTypeClassStruct
 
-def struct_summary(value: lldb.SBValue, internal_dict) -> str:
-    if value.IsSynthetic():
-        value = value.GetNonSyntheticValue()
+def struct_summary(v: lldb.SBValue, internal_dict) -> str:
+    if v.IsSynthetic():
+        v = v.GetNonSyntheticValue()
     
-    output = type_display(value.type)
+    output = type_display(v.type)
     output += "{"
 
-    for i, field in enumerate(value.children):
+    for i, field in enumerate(v.children):
 
         # Let LLDB handle the formatting using registered formatters
         output += field.GetSummary() or field.GetValue() or "<no value>"
 
-        if i < len(value.children) - 1:
+        if i < len(v.children) - 1:
             output += ", "
 
     output += "}"
     return output
 
-def type_display(type: lldb.SBType) -> str:
-    name = type.name.replace("::", ".")
-    if type.is_pointer:   name = f"^{name}"
-    if type.is_reference: name = f"&{name}"
+def type_display(t: lldb.SBType) -> str:
+    name = t.name.replace("::", ".")
+    if t.is_pointer:   name = f"^{name}"
+    if t.is_reference: name = f"&{name}"
     return name
 
 def __lldb_init_module(debugger, unused):
