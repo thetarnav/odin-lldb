@@ -228,10 +228,7 @@ def is_type_union(t, internal_dict):
         return False
 
     tag = t.GetFieldAtIndex(0)
-    if tag == None or tag.name != "tag":
-        return False
-
-    return True
+    return tag and tag.IsValid() and tag.name == "tag"
 
 def detect_union_no_nil(union_type, union_value=None):
     """
@@ -262,45 +259,23 @@ def union_summary(value, internal_dict):
     assert(tag.name == "tag")
     
     tag_value = tag.unsigned
+    variant_name = f"v{tag_value}"
     
     is_no_nil = detect_union_no_nil(value.type, value)
     
-    if is_no_nil:
-        # For #no_nil unions, tag 0 = first variant (v0), tag 1 = second variant (v1), etc.
-        variant_name = f"v{tag_value}"
-    else:
-        # For regular unions, tag 0 = nil, tag 1 = first variant (v1), etc.
-        if tag_value == 0:
-            return "nil"
-        variant_name = f"v{tag_value}"
+    if not is_no_nil and tag_value == 0:
+        return "nil"
     
-    try:
-        variant = value.GetChildMemberWithName(variant_name)
-        if variant and variant.IsValid():
-            return f"{variant}"
-        else:
-            return f"<invalid variant {variant_name}, tag={tag_value}, no_nil={is_no_nil}>"
-    except:
-        return f"<error accessing variant {variant_name}, tag={tag_value}, no_nil={is_no_nil}>"
+    variant = value.GetChildMemberWithName(variant_name)
+    if not variant.IsValid():
+        return f"<invalid variant {variant_name}, tag={tag_value}, no_nil={is_no_nil}>"
+
+    return f"{variant}"
 
 def __lldb_init_module(debugger, unused):
-    debugger.HandleCommand(
-        "type summary add --recognizer-function --python-function odin.union_summary odin.is_type_union"
-    )
-    debugger.HandleCommand(
-        "type synth add --recognizer-function --python-class odin.UnionChildProvider odin.is_type_union"
-    )
-
-    debugger.HandleCommand(
-        "type summary add --recognizer-function --python-function odin.string_summary odin.is_string_type"
-    )
-    debugger.HandleCommand(
-        "type synth add --recognizer-function --python-class odin.SliceChildProvider odin.is_slice_type"
-    )
-    debugger.HandleCommand(
-        "type summary add --recognizer-function --python-function odin.slice_summary odin.is_slice_type"
-    )
-    
-    debugger.HandleCommand(
-        "type synth add --recognizer-function --python-class odin.MapChildProvider odin.is_map_type"
-    )
+    debugger.HandleCommand("type summary add --recognizer-function --python-function odin.union_summary odin.is_type_union")
+    debugger.HandleCommand("type synth add --recognizer-function --python-class odin.UnionChildProvider odin.is_type_union")
+    debugger.HandleCommand("type summary add --recognizer-function --python-function odin.string_summary odin.is_string_type")
+    debugger.HandleCommand("type synth add --recognizer-function --python-class odin.SliceChildProvider odin.is_slice_type")
+    debugger.HandleCommand("type summary add --recognizer-function --python-function odin.slice_summary odin.is_slice_type")
+    debugger.HandleCommand("type synth add --recognizer-function --python-class odin.MapChildProvider odin.is_map_type")
