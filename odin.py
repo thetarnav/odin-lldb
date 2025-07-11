@@ -229,7 +229,7 @@ class UnionChildProvider:
     def update(self):
         self.children      = self.val.children
         self.variant_index = self.children[0].unsigned
-        self.is_no_nil     = detect_union_no_nil(self.val.type, self.val)
+        self.is_no_nil     = detect_union_no_nil(self.val.type)
         
         return False
 
@@ -253,7 +253,7 @@ class UnionChildProvider:
 
         return c
 
-def detect_union_no_nil(union_type, union_value=None):
+def detect_union_no_nil(t: lldb.SBType) -> bool:
     """
     normal & #shared_nil union type:
         tag: u64
@@ -266,8 +266,8 @@ def detect_union_no_nil(union_type, union_value=None):
         v1:  T1
         ...
     """
-    tag_field = union_type.GetFieldAtIndex(0)
-    first_variant = union_type.GetFieldAtIndex(1)
+    tag_field = t.GetFieldAtIndex(0)
+    first_variant = t.GetFieldAtIndex(1)
 
     return (
         tag_field is not None and tag_field.name == "tag" and
@@ -284,7 +284,7 @@ def union_summary(v: lldb.SBValue, _dict) -> str:
     tag_value = tag.unsigned
     variant_name = f"v{tag_value}"
     
-    is_no_nil = detect_union_no_nil(v.type, v)
+    is_no_nil = detect_union_no_nil(v.type)
     
     if not is_no_nil and tag_value == 0:
         return "nil"
