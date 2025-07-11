@@ -1,3 +1,12 @@
+"""
+Python script to visualize Odin slices, maps, strings, etc. in LLDB.
+
+Based on harold-b's script: https://gist.github.com/harold-b/ef16a5c3ebcceccfc2bc7a5c5dd0058d
+and laytan's script: https://gist.github.com/laytan/a94c323a84cef7bcfbdf6d21987fd5a9
+
+Repository: https://github.com/thetarnav/odin-lldb
+"""
+
 import lldb
 import math
 

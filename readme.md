@@ -1,4 +1,16 @@
-# LLDB Python Module
+# Odin LLDB script
+
+Python script to visualize Odin slices, maps, strings, etc. in LLDB.
+
+Based on the work of [harold-b](https://gist.github.com/harold-b/ef16a5c3ebcceccfc2bc7a5c5dd0058d) and [laytan](https://gist.github.com/laytan/a94c323a84cef7bcfbdf6d21987fd5a9).
+
+## Installation
+
+Refer to https://gist.github.com/laytan/a94c323a84cef7bcfbdf6d21987fd5a9?permalink_comment_id=5036057#gistcomment-5036057
+
+## Development
+
+### LLDB Python Module
 
 To point the Python LSP extension to the LLDB module.
 
