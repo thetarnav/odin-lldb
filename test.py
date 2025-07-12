@@ -14,6 +14,26 @@ import subprocess
 import sys
 from typing import List, Optional
 
+class ANSI:
+    RED       = '\033[91m'
+    GREEN     = '\033[92m'
+    YELLOW    = '\033[93m'
+    BLUE      = '\033[94m'
+    MAGENTA   = '\033[95m'
+    CYAN      = '\033[96m'
+    WHITE     = '\033[97m'
+    BOLD      = '\033[1m'
+    UNDERLINE = '\033[4m'
+    END       = '\033[0m'
+
+def colored   (text: str, color: str) -> str: return f"{color}{text}{ANSI.END}"
+
+def success   (text: str) -> str: return colored(text, ANSI.GREEN)
+def error     (text: str) -> str: return colored(text, ANSI.RED)
+def warning   (text: str) -> str: return colored(text, ANSI.YELLOW)
+def info      (text: str) -> str: return colored(text, ANSI.BLUE)
+def highlight (text: str) -> str: return colored(text, ANSI.BOLD)
+
 
 class TestCase:
     variable_name: str
@@ -28,26 +48,26 @@ class TestCase:
     def __repr__(self):
         return f"TestCase({self.variable_name}, '{self.command}', '{self.expected}')"
 
-def print_line(msg: str, width: int = 80) -> None:
-    print(msg.center(width, '-'))
+def print_line(msg: str, width: int = 80, color: str = ANSI.CYAN) -> None:
+    print(colored(msg.center(width, '-'), color))
 
 def run_build_script() -> bool:
-    print("Building Odin program...")
+    print(info("Building Odin program..."))
     print_line("build.sh")
     try:
         # Run without capturing output so it shows in real-time
         subprocess.run(['bash', 'build.sh'], 
                        text=True, 
                        check=True)
-        print_line("success")
+        print_line("success", color=ANSI.GREEN)
         return True
     except subprocess.CalledProcessError as e:
-        print_line(f"failed: {e.returncode}")
+        print_line(f"failed: {e.returncode}", color=ANSI.RED)
         return False
 
 
 def parse_test_cases(filename: str) -> List[TestCase]:
-    print(f"Parsing test cases from {filename}...")
+    print(info(f"Parsing test cases from {filename}..."))
     
     test_cases = []
     
@@ -69,7 +89,7 @@ def parse_test_cases(filename: str) -> List[TestCase]:
         
         test_cases.append(TestCase(var_name, command, expected))
     
-    print(f"Found {len(test_cases)} test cases")
+    print(success(f"Found {len(test_cases)} test cases"))
     return test_cases
 
 
@@ -96,7 +116,7 @@ def run_lldb(test_cases: List[TestCase]) -> str:
     cmd.append("-o")
     cmd.append("quit")
 
-    print("Running LLDB session:", " ".join(cmd))
+    print(info("Running LLDB session:\n"), " ".join(cmd))
     print_line("lldb")
     
     timeout = 120
@@ -109,8 +129,8 @@ def run_lldb(test_cases: List[TestCase]) -> str:
                                 timeout=timeout)
         
         if result.returncode != 0:
-            print(f"LLDB exited with code {result.returncode}")
-            print(f"Stderr: {result.stderr}")
+            print(error(f"LLDB exited with code {result.returncode}"))
+            print(error(f"Stderr: {result.stderr}"))
 
         # Use Popen to stream output in real-time while capturing it
         process = subprocess.Popen(cmd,
@@ -130,19 +150,19 @@ def run_lldb(test_cases: List[TestCase]) -> str:
         
         return_code = process.wait(timeout=timeout)
         if return_code != 0:
-            print(f"\nLLDB exited with code {return_code}")
+            print(error(f"\nLLDB exited with code {return_code}"))
         
         return ''.join(output_lines)
     
     except subprocess.TimeoutExpired:
         if process:
             process.kill()
-        print(f"\nLLDB session timed out after {timeout} seconds")
-        print("This might be due to DWARF symbol indexing taking too long.")
+        print(error(f"\nLLDB session timed out after {timeout} seconds"))
+        print(warning("This might be due to DWARF symbol indexing taking too long."))
         return ""
     except FileNotFoundError:
-        print("Error: LLDB not found. Please install LLDB.")
-        print("On Ubuntu: sudo apt-get install lldb")
+        print(error("Error: LLDB not found. Please install LLDB."))
+        print(info("On Ubuntu: sudo apt-get install lldb"))
         return ""
 
 
@@ -173,16 +193,16 @@ def parse_lldb_output(output: str, test_cases: List[TestCase]) -> dict[str, str 
 def run_test_case(test_case: TestCase, actual_output: Optional[str]) -> bool:
     """Validate a single test case result."""
     if actual_output is None:
-        print(f"  FAIL: {test_case.variable_name} - No output captured")
+        print(error(f"  FAIL: {test_case.variable_name} - No output captured"))
         return False
     
     if compare_outputs(test_case.expected, actual_output):
-        print(f"  PASS: {test_case.variable_name}")
+        print(success(f"  PASS: {test_case.variable_name}"))
         return True
     else:
-        print(f"  FAIL: {test_case.variable_name}")
-        print(f"    Expected: {test_case.expected}")
-        print(f"    Actual:   {actual_output}")
+        print(error(f"  FAIL: {test_case.variable_name}"))
+        print(f"    {success('Expected:')} {highlight(test_case.expected)}")
+        print(f"    {error('Actual:')}   {highlight(actual_output)}")
         return False
 
 
@@ -199,33 +219,32 @@ def check_dependencies() -> bool:
                            capture_output=True, 
                            check=True)
         except (subprocess.CalledProcessError, FileNotFoundError):
-            print(f"Error: {error_msg}")
+            print(error(f"Error: {error_msg}"))
             return False
     
     return True
 
 
 def run_tests() -> bool:
-    print("Starting LLDB Odin tests...")
+    print(highlight("Starting LLDB Odin tests..."))
     
     # Check dependencies first
     if not check_dependencies():
-        print("Dependency check failed, aborting tests")
+        print(error("Dependency check failed, aborting tests"))
         return False
     
     if not run_build_script():
-        print("Build failed, aborting tests")
+        print(error("Build failed, aborting tests"))
         return False
     
     test_cases = parse_test_cases("main.odin")
     if not test_cases:
-        print("No test cases found")
+        print(warning("No test cases found"))
         return False
     
     lldb_output = run_lldb(test_cases)
     
     print_line("end")
-    print("Parsing LLDB output and validating test cases...")
     
     results = parse_lldb_output(lldb_output, test_cases)
     
@@ -236,16 +255,16 @@ def run_tests() -> bool:
         if not run_test_case(test_case, actual_output):
             failed += 1
     
-    print(f"\nTest Results:")
+    print(f"\n{highlight('Test Results:')}")
 
     if failed == 0:
-        print("All tests passed! 🎉")
+        print(success("All tests passed! 🎉"))
         return True
     else:
-        print(f"  Failed: {failed}/{len(test_cases)}")
+        print(error(f"  Failed: {failed}/{len(test_cases)}"))
         return False
 
 
 if __name__ == "__main__":
-    success = run_tests()
-    sys.exit(0 if success else 1)
+    test_success = run_tests()
+    sys.exit(0 if test_success else 1)
