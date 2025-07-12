@@ -10,6 +10,14 @@ Refer to https://gist.github.com/laytan/a94c323a84cef7bcfbdf6d21987fd5a9?permali
 
 ## Development
 
+### Running tests
+
+To run the tests locally:
+
+```bash
+./test.py
+```
+
 ### LLDB Python Module
 
 To point the Python LSP extension to the LLDB module.
