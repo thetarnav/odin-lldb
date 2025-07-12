@@ -43,7 +43,7 @@ main :: proc () {
 
 	writer := io.Writer{}
 	// (lldb) p writer
-	// (io::Stream) io.Stream{0x0000000000000000, 0x0000000000000000}
+	// (io::Stream) io.Stream{%PTR%, %PTR%}
 
 	breakpoint() // for lldb to breakpoint here
 	return
