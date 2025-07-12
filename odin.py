@@ -46,6 +46,7 @@ def is_type_string (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == O
 def is_type_map    (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.MAP
 def is_type_struct (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.STRUCT
 def is_type_union  (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.UNION
+def is_type_pointer(t: lldb.SBType, _dict) -> bool: return t.is_pointer
 
 def slice_summary(value: lldb.SBValue, _dict) -> str:
     value  = value.GetNonSyntheticValue()
@@ -320,11 +321,33 @@ def type_display(t: lldb.SBType) -> str:
     return name
 
 
+def pointer_summary(ptr: lldb.SBValue, _dict) -> str:
+
+    if ptr.GetValueAsUnsigned() == 0:
+        return "nil"
+
+    pointee: lldb.SBValue = ptr.Dereference()
+    if not pointee.IsValid():
+        return type_display(ptr.type)
+    
+    pointee_summary = pointee.GetSummary()
+    if pointee_summary:
+        return f"^{pointee_summary}"
+    else:
+        pointee_type = type_display(ptr.type)
+        pointee_value = pointee.GetValue()
+        if pointee_value:
+            return f"({pointee_type}){pointee_value}"
+        else:
+            return f"{pointee_type}"
+
+
 def __lldb_init_module(debugger: lldb.SBDebugger, unused) -> None:
-    debugger.HandleCommand("type summary add --recognizer-function --python-function odin.union_summary      odin.is_type_union")
-    debugger.HandleCommand("type synth   add --recognizer-function --python-class    odin.UnionChildProvider odin.is_type_union")
-    debugger.HandleCommand("type summary add --recognizer-function --python-function odin.string_summary     odin.is_type_string")
-    debugger.HandleCommand("type synth   add --recognizer-function --python-class    odin.SliceChildProvider odin.is_type_slice")
-    debugger.HandleCommand("type summary add --recognizer-function --python-function odin.slice_summary      odin.is_type_slice")
-    debugger.HandleCommand("type synth   add --recognizer-function --python-class    odin.MapChildProvider   odin.is_type_map")
-    debugger.HandleCommand("type summary add --recognizer-function --python-function odin.struct_summary     odin.is_type_struct")
+    debugger.HandleCommand("type summary add --python-function odin.pointer_summary --no-value --recognizer-function odin.is_type_pointer")
+    debugger.HandleCommand("type summary add --python-function odin.union_summary              --recognizer-function odin.is_type_union")
+    debugger.HandleCommand("type synth   add --python-class    odin.UnionChildProvider         --recognizer-function odin.is_type_union")
+    debugger.HandleCommand("type summary add --python-function odin.string_summary             --recognizer-function odin.is_type_string")
+    debugger.HandleCommand("type synth   add --python-class    odin.SliceChildProvider         --recognizer-function odin.is_type_slice")
+    debugger.HandleCommand("type summary add --python-function odin.slice_summary              --recognizer-function odin.is_type_slice")
+    debugger.HandleCommand("type synth   add --python-class    odin.MapChildProvider           --recognizer-function odin.is_type_map")
+    debugger.HandleCommand("type summary add --python-function odin.struct_summary             --recognizer-function odin.is_type_struct")

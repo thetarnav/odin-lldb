@@ -17,6 +17,10 @@ main :: proc () {
 	// (lldb) p foo
 	// (main::Foo) main.Foo{"Hello", 42}
 
+	foo_ptr := &foo
+	// (lldb) p foo_ptr
+	// (main::Foo *) ^main.Foo{"Hello", 42}
+
 	bar := Bar{"World", 84}
 	// (lldb) p bar
 	// (main::Bar) main.Bar{"World", 84}
@@ -39,11 +43,11 @@ main :: proc () {
 
 	foo_bar_union_shared_nil: Foo_Bar_Union_Shared_Nil = &foo
 	// (lldb) p foo_bar_union_shared_nil
-	// (main::Foo_Bar_Union_Shared_Nil) (main::Foo *) v2 = %PTR% ^main.Foo *{"Hello", 42}
+	// (main::Foo_Bar_Union_Shared_Nil) (main::Foo *) v2 = ^main.Foo{"Hello", 42}
 
 	writer := io.Writer{}
 	// (lldb) p writer
-	// (io::Stream) io.Stream{%PTR%, %PTR%}
+	// (io::Stream) io.Stream{nil, nil}
 
 	breakpoint() // for lldb to breakpoint here
 	return
