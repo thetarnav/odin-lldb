@@ -4,8 +4,8 @@
         {
             "label": "build",
             "type": "shell",
-            "command": "odin",
-            "args": ["build", "${workspaceFolder}", "-debug", "-out:${workspaceFolder}/main.bin"],
+            "command": "bash",
+            "args": ["build.sh"],
             "group": "build",
             "presentation": {
                 "echo": true,
