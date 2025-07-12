@@ -32,5 +32,9 @@ main :: proc () {
 	fmt.println("Foo_Bar_Union_Shared_Nil: ", foo_bar_union_shared_nil)
 	fmt.println("writer=", writer)
 
+	breakpoint() // for lldb to breakpoint here
 	return
 }
+
+@(link_name="breakpoint")
+breakpoint :: proc () {}
