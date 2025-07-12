@@ -28,20 +28,21 @@ class TestCase:
     def __repr__(self):
         return f"TestCase({self.variable_name}, '{self.command}', '{self.expected}')"
 
+def print_line(msg: str, width: int = 80) -> None:
+    print(msg.center(width, '-'))
 
 def run_build_script() -> bool:
     print("Building Odin program...")
+    print_line("build.sh")
     try:
+        # Run without capturing output so it shows in real-time
         subprocess.run(['bash', 'build.sh'], 
-                       capture_output=True, 
                        text=True, 
                        check=True)
-        print("Build successful!")
+        print_line("success")
         return True
     except subprocess.CalledProcessError as e:
-        print(f"Build failed: {e}")
-        print(f"Stdout: {e.stdout}")
-        print(f"Stderr: {e.stderr}")
+        print_line(f"failed: {e.returncode}")
         return False
 
 
@@ -95,9 +96,11 @@ def run_lldb(test_cases: List[TestCase]) -> str:
     cmd.append("-o")
     cmd.append("quit")
 
-    print("Running LLDB session...")
+    print("Running LLDB session:", " ".join(cmd))
+    print_line("lldb")
     
     timeout = 120
+    process = None
     
     try:
         result = subprocess.run(cmd, 
@@ -108,11 +111,33 @@ def run_lldb(test_cases: List[TestCase]) -> str:
         if result.returncode != 0:
             print(f"LLDB exited with code {result.returncode}")
             print(f"Stderr: {result.stderr}")
+
+        # Use Popen to stream output in real-time while capturing it
+        process = subprocess.Popen(cmd,
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.STDOUT,
+                                   text=True,
+                                   bufsize=1,  # Line buffered
+                                   universal_newlines=True)
         
-        return result.stdout
+        output_lines = []
+        
+        # Read output line by line and display it while capturing
+        if process.stdout:
+            for line in process.stdout:
+                print(line, end='')
+                output_lines.append(line)
+        
+        return_code = process.wait(timeout=timeout)
+        if return_code != 0:
+            print(f"\nLLDB exited with code {return_code}")
+        
+        return ''.join(output_lines)
     
     except subprocess.TimeoutExpired:
-        print(f"LLDB session timed out after {timeout} seconds")
+        if process:
+            process.kill()
+        print(f"\nLLDB session timed out after {timeout} seconds")
         print("This might be due to DWARF symbol indexing taking too long.")
         return ""
     except FileNotFoundError:
@@ -198,6 +223,9 @@ def run_tests() -> bool:
         return False
     
     lldb_output = run_lldb(test_cases)
+    
+    print_line("end")
+    print("Parsing LLDB output and validating test cases...")
     
     results = parse_lldb_output(lldb_output, test_cases)
     
