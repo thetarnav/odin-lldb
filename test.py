@@ -97,16 +97,28 @@ def run_lldb(test_cases: List[TestCase]) -> str:
 
     print("Running LLDB session...")
     
-    result = subprocess.run(cmd, 
-                            capture_output=True, 
-                            text=True, 
-                            timeout=30)
+    timeout = 120
     
-    if result.returncode != 0:
-        print(f"LLDB exited with code {result.returncode}")
-        print(f"Stderr: {result.stderr}")
+    try:
+        result = subprocess.run(cmd, 
+                                capture_output=True, 
+                                text=True, 
+                                timeout=timeout)
+        
+        if result.returncode != 0:
+            print(f"LLDB exited with code {result.returncode}")
+            print(f"Stderr: {result.stderr}")
+        
+        return result.stdout
     
-    return result.stdout
+    except subprocess.TimeoutExpired:
+        print(f"LLDB session timed out after {timeout} seconds")
+        print("This might be due to DWARF symbol indexing taking too long.")
+        return ""
+    except FileNotFoundError:
+        print("Error: LLDB not found. Please install LLDB.")
+        print("On Ubuntu: sudo apt-get install lldb")
+        return ""
 
 
 def parse_lldb_output(output: str, test_cases: List[TestCase]) -> dict[str, str | None]:
@@ -149,8 +161,32 @@ def run_test_case(test_case: TestCase, actual_output: Optional[str]) -> bool:
         return False
 
 
+def check_dependencies() -> bool:
+    required_checks = [
+        (["odin", "version"],   "Odin compiler not found. Please install Odin."),
+        (["lldb", "--version"], "LLDB debugger not found. Please install LLDB.\nOn Ubuntu: sudo apt-get install lldb"),
+        (["bash", "--version"], "Bash shell not found.")
+    ]
+    
+    for cmd, error_msg in required_checks:
+        try:
+            subprocess.run(cmd, 
+                           capture_output=True, 
+                           check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            print(f"Error: {error_msg}")
+            return False
+    
+    return True
+
+
 def run_tests() -> bool:
     print("Starting LLDB Odin tests...")
+    
+    # Check dependencies first
+    if not check_dependencies():
+        print("Dependency check failed, aborting tests")
+        return False
     
     if not run_build_script():
         print("Build failed, aborting tests")
