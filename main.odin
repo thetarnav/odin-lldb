@@ -25,9 +25,9 @@ main :: proc () {
 	// (lldb) p enum_value
 	// (main::Enum) Three
 
-	foo_bar_union: Foo_Bar_Union = "yooo"
+	foo_bar_union: Foo_Bar_Union = "hello world"
 	// (lldb) p foo_bar_union
-	// (main::Foo_Bar_Union) (string) v3 = "yooo"
+	// (main::Foo_Bar_Union) (string) v3 = "hello world"
 
 	foo_bar_union_nil: Foo_Bar_Union
 	// (lldb) p foo_bar_union_nil
