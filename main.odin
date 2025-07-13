@@ -38,7 +38,7 @@ main :: proc () {
 
 	foo_bar_union: Foo_Bar_Union = "hello world"
 	// (lldb) p foo_bar_union
-	// (main::Foo_Bar_Union) (string) v3 = "hello world"
+	// (main::Foo_Bar_Union) string("hello world")
 
 	foo_bar_union_nil: Foo_Bar_Union
 	// (lldb) p foo_bar_union_nil
@@ -46,11 +46,11 @@ main :: proc () {
 
 	foo_bar_union_no_nil: Foo_Bar_Union_No_Nill = foo
 	// (lldb) p foo_bar_union_no_nil
-	// (main::Foo_Bar_Union_No_Nill) (main::Foo) v0 = {"Hello", 42}
+	// (main::Foo_Bar_Union_No_Nill) main.Foo({"Hello", 42})
 
 	foo_bar_union_shared_nil: Foo_Bar_Union_Shared_Nil = &foo
 	// (lldb) p foo_bar_union_shared_nil
-	// (main::Foo_Bar_Union_Shared_Nil) (main::Foo *) v2 = &{"Hello", 42}
+	// (main::Foo_Bar_Union_Shared_Nil) ^main.Foo(&{"Hello", 42})
 
 	writer := io.Writer{}
 	// (lldb) p writer

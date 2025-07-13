@@ -290,11 +290,11 @@ def union_summary(v: lldb.SBValue, _dict) -> str:
     if not is_no_nil and tag_value == 0:
         return "nil"
     
-    variant = v.GetChildMemberWithName(variant_name)
+    variant: lldb.SBValue = v.GetChildMemberWithName(variant_name)
     if not variant.IsValid():
         return f"<invalid variant {variant_name}, tag={tag_value}, no_nil={is_no_nil}>"
 
-    return f"{variant}"
+    return f"{type_display(variant.type)}({value_summary(variant)})"
 
 def struct_summary(v: lldb.SBValue, _dict) -> str:
     if v.IsSynthetic():
@@ -305,7 +305,7 @@ def struct_summary(v: lldb.SBValue, _dict) -> str:
     for i, field in enumerate(v.children):
 
         # Let LLDB handle the formatting using registered formatters
-        output += field.GetSummary() or field.GetValue() or "<no value>"
+        output += value_summary(field)
 
         if i < len(v.children) - 1:
             output += ", "
@@ -325,6 +325,8 @@ def type_display(t: lldb.SBType) -> str:
     if t.is_reference: name = f"&{name}"
     return name
 
+def value_summary(value: lldb.SBValue) -> str:
+    return value.GetSummary() or value.GetValue() or "<no value>"
 
 def pointer_summary(ptr: lldb.SBValue, _dict) -> str:
 
