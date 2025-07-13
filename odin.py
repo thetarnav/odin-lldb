@@ -300,8 +300,7 @@ def struct_summary(v: lldb.SBValue, _dict) -> str:
     if v.IsSynthetic():
         v = v.GetNonSyntheticValue()
     
-    output = type_display(v.type)
-    output += "{"
+    output = "{"
 
     for i, field in enumerate(v.children):
 
@@ -343,7 +342,7 @@ def pointer_summary(ptr: lldb.SBValue, _dict) -> str:
     
     pointee_summary = pointee.GetSummary()
     if pointee_summary:
-        return f"^{pointee_summary}"
+        return f"&{pointee_summary}"
     else:
         pointee_type = type_display(ptr.type)
         pointee_value = pointee.GetValue()

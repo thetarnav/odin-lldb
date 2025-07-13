@@ -15,14 +15,14 @@ main :: proc () {
 
 	foo := Foo{"Hello", 42}
 	// (lldb) p foo
-	// (main::Foo) main.Foo{"Hello", 42}
+	// (main::Foo) {"Hello", 42}
 
 	// (lldb) p foo.foo_name
 	// (string) "Hello"
 
 	foo_ptr := &foo
 	// (lldb) p foo_ptr
-	// (main::Foo *) ^main.Foo{"Hello", 42}
+	// (main::Foo *) &{"Hello", 42}
 
 	foo_raw_ptr := rawptr(foo_ptr)
 	// (lldb) p foo_raw_ptr
@@ -30,7 +30,7 @@ main :: proc () {
 
 	bar := Bar{"World", 84}
 	// (lldb) p bar
-	// (main::Bar) main.Bar{"World", 84}
+	// (main::Bar) {"World", 84}
 
 	enum_value := Enum.Three
 	// (lldb) p enum_value
@@ -46,15 +46,15 @@ main :: proc () {
 
 	foo_bar_union_no_nil: Foo_Bar_Union_No_Nill = foo
 	// (lldb) p foo_bar_union_no_nil
-	// (main::Foo_Bar_Union_No_Nill) (main::Foo) v0 = main.Foo{"Hello", 42}
+	// (main::Foo_Bar_Union_No_Nill) (main::Foo) v0 = {"Hello", 42}
 
 	foo_bar_union_shared_nil: Foo_Bar_Union_Shared_Nil = &foo
 	// (lldb) p foo_bar_union_shared_nil
-	// (main::Foo_Bar_Union_Shared_Nil) (main::Foo *) v2 = ^main.Foo{"Hello", 42}
+	// (main::Foo_Bar_Union_Shared_Nil) (main::Foo *) v2 = &{"Hello", 42}
 
 	writer := io.Writer{}
 	// (lldb) p writer
-	// (io::Stream) io.Stream{nil, nil}
+	// (io::Stream) {nil, nil}
 
 	// (lldb) p writer.procedure
 	// (io::Stream_Proc) nil
