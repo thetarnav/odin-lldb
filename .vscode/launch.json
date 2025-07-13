@@ -18,6 +18,15 @@
             "args": "${input:programArgs}",
             "cwd": "${workspaceFolder}",
             "stopOnEntry": false
+        },
+        {
+            "type": "debugpy",
+            "request": "launch",
+            "name": "Run Test",
+            "program": "${workspaceFolder}/test.py",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
         }
     ],
     "inputs": [
