@@ -62,17 +62,21 @@ main :: proc () {
 	// (lldb) p writer.data
 	// (void *) nil
 
-	foo_proc := proc (f: ^Foo, b: Bar) -> (ok: bool) {return}
+	foo_proc := proc (f: ^Foo, b: Bar) {return}
 	// (lldb) p foo_proc
-	// (proc(f:^main::Foo,b:main::Bar)->(ok:bool)) proc (^main.Foo, main.Bar) -> bool
+	// (proc(f:^main::Foo,b:main::Bar)) proc "c" (^main.Foo, main.Bar, ^runtime.Context)
+
+	foo_proc_ok := proc (f: ^Foo, b: Bar) -> (ok: bool) {return}
+	// (lldb) p foo_proc_ok
+	// (proc(f:^main::Foo,b:main::Bar)->(ok:bool)) proc "c" (^main.Foo, main.Bar, ^runtime.Context) -> bool
 
 	foo_proc_multi_res := proc (f: Foo, b: Bar) -> (idx: int, ok: bool) {return}
 	// (lldb) p foo_proc_multi_res
-	// (proc(f:main::Foo,b:main::Bar)->(idx:int,ok:bool)) proc (main.Foo, main.Bar) -> (int, bool)
+	// (proc(f:main::Foo,b:main::Bar)->(idx:int,ok:bool)) proc "c" (main.Foo, main.Bar, int, ^runtime.Context) -> bool
 
 	foo_bar_contextless := proc "contextless" (f: Foo, b: Bar) -> (idx: int, ok: bool) {return}
 	// (lldb) p foo_bar_contextless
-	// (proc"contextless"(f:main::Foo,b:main::Bar)->(idx:int,ok:bool)) proc "contextless" (main.Foo, main.Bar) -> (int, bool)
+	// (proc"contextless"(f:main::Foo,b:main::Bar)->(idx:int,ok:bool)) proc "c" (main.Foo, main.Bar, int) -> bool
 
 	breakpoint() // for lldb to breakpoint here
 	return

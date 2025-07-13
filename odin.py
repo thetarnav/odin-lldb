@@ -333,35 +333,10 @@ def type_display(t: lldb.SBType) -> str:
 def value_summary(value: lldb.SBValue) -> str:
     return value.GetSummary() or value.GetValue() or "<no value>"
 
-def pointer_summary(ptr: lldb.SBValue, _dict) -> str:
+def correct_proc_type_display(t: lldb.SBType) -> str:
 
-    # nil pointer
-    if ptr.GetValueAsUnsigned() == 0:
-        return "nil"
-    
-    # raw pointer
-    if ptr.type.name == "void *":
-        return f"rawptr({ptr.GetValue()})"
+    type_name = t.name
 
-    pointee: lldb.SBValue = ptr.Dereference()
-    if not pointee.IsValid():
-        return type_display(ptr.type)
-    
-    pointee_summary = pointee.GetSummary()
-    if pointee_summary:
-        return f"&{pointee_summary}"
-    else:
-        pointee_type = type_display(ptr.type)
-        pointee_value = pointee.GetValue()
-        if pointee_value:
-            return f"({pointee_type}){pointee_value}"
-        else:
-            return f"{pointee_type}"
-
-def proc_summary(proc_val: lldb.SBValue, _dict) -> str:
-    """Format procedure types in Odin style"""
-    type_name = proc_val.type.name
-    
     # The type name already contains most of what we need
     # e.g., "proc(f:^main::Foo,b:main::Bar)->(ok:bool)"
     # We need to convert it to: "proc (^main.Foo, main.Bar) -> bool"
@@ -436,10 +411,60 @@ def proc_summary(proc_val: lldb.SBValue, _dict) -> str:
     
     return result.replace('  ', ' ').strip()  # Clean up extra spaces
 
+def pointer_summary(ptr: lldb.SBValue, _dict) -> str:
+
+    # nil pointer
+    if ptr.GetValueAsUnsigned() == 0:
+        return "nil"
+    
+    # raw pointer
+    if ptr.type.name == "void *":
+        return f"rawptr({ptr.GetValue()})"
+    
+    # proc pointer
+    pointee_type = ptr.type.GetPointeeType()
+    if pointee_type.type == lldb.eTypeClassFunction:
+        
+        params = []
+        return_type = None
+        
+        return_type_obj = pointee_type.GetFunctionReturnType()
+        if return_type_obj.IsValid():
+            return_type = type_display(return_type_obj)
+        
+        num_args = pointee_type.GetFunctionArgumentTypes().GetSize()
+        for i in range(num_args):
+            param_type = pointee_type.GetFunctionArgumentTypes().GetTypeAtIndex(i)
+            if param_type.IsValid():
+                param_type_str = type_display(param_type)
+                params.append(param_type_str)
+        
+        params_str = ', '.join(params)
+        result = f'proc "c" ({params_str})'
+        
+        if return_type and return_type != "void":
+            result += f" -> {return_type}"
+        
+        return result
+
+    # Regular pointer
+    pointee: lldb.SBValue = ptr.Dereference()
+    if not pointee.IsValid():
+        return type_display(ptr.type)
+    
+    pointee_summary = pointee.GetSummary()
+    if pointee_summary:
+        return f"&{pointee_summary}"
+    else:
+        pointee_type = type_display(ptr.type)
+        pointee_value = pointee.GetValue()
+        if pointee_value:
+            return f"({pointee_type}){pointee_value}"
+        else:
+            return f"{pointee_type}"
 
 def __lldb_init_module(debugger: lldb.SBDebugger, unused) -> None:
     debugger.HandleCommand("type summary add --python-function odin.pointer_summary --no-value --recognizer-function odin.is_type_pointer")
-    debugger.HandleCommand("type summary add --python-function odin.proc_summary    --no-value --recognizer-function odin.is_type_proc")
     debugger.HandleCommand("type summary add --python-function odin.union_summary              --recognizer-function odin.is_type_union")
     debugger.HandleCommand("type synth   add --python-class    odin.UnionChildProvider         --recognizer-function odin.is_type_union")
     debugger.HandleCommand("type summary add --python-function odin.string_summary             --recognizer-function odin.is_type_string")
