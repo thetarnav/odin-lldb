@@ -71,15 +71,43 @@ def parse_test_cases(filename: str) -> List[TestCase]:
     # Pattern to match:
     # // (lldb) command
     # // expected_output
-    pattern = r'//\s*\(lldb\)\s*(.+?)\n\s*//\s*(.+?)(?=\n|$)'
-    
-    matches = re.findall(pattern, content, re.MULTILINE | re.DOTALL)
-    
-    for match in matches:
-        command  = match[0].strip()
-        expected = match[1].strip()
 
-        test_cases.append(TestCase(command, expected))
+    test_cases: List[TestCase] = []
+    lines = content.split('\n')
+    line_i = 0
+    
+    while line_i < len(lines):
+        line = lines[line_i].strip()
+        
+        # Look for "// (lldb) command" lines
+        if line.startswith('//'):
+            lldb_pos = line.find('(lldb)')
+            if lldb_pos != -1:
+                command = line[lldb_pos + 6:].strip()
+                
+                expected_lines = []
+                line_i += 1
+                
+                while line_i < len(lines):
+                    next_line = lines[line_i].strip()
+
+                    # not a comment
+                    if not next_line.startswith('//'):
+                        break
+
+                    # next command
+                    if '(lldb)' in next_line:
+                        line_i -= 1  # step back to reprocess this line
+                        break
+                    
+                    expected_lines.append(next_line[2:].strip())
+                    line_i += 1
+                
+                if expected_lines:
+                    expected = '\n'.join(expected_lines)
+                    test_cases.append(TestCase(command, expected))
+        
+        line_i += 1
 
     print(success(f"Found {len(test_cases)} test cases"))
     return test_cases
