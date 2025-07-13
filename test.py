@@ -12,6 +12,7 @@ This script:
 import re
 import subprocess
 import sys
+import shutil
 from typing import List, Optional
 
 class ANSI:
@@ -40,7 +41,8 @@ class TestCase:
         self.command  = command
         self.expected = expected
 
-def print_line(msg: str, width: int = 80, color: str = ANSI.CYAN) -> None:
+def print_line(msg: str, color: str = ANSI.CYAN) -> None:
+    width = shutil.get_terminal_size().columns
     print(colored(msg.center(width, '-'), color))
 
 def run_build_script() -> bool:
@@ -244,14 +246,12 @@ def run_tests() -> bool:
         actual_output = results.get(test_case.command)
         if not run_test_case(test_case, actual_output):
             failed += 1
-    
-    print(f"\n{highlight('Test Results:')}")
 
     if failed == 0:
         print(success("All tests passed! 🎉"))
         return True
     else:
-        print(error(f"  Failed: {failed}/{len(test_cases)}"))
+        print(error(f"  Failed: {len(test_cases)-failed}/{len(test_cases)}"))
         return False
 
 
