@@ -36,3 +36,8 @@ echo "$(lldb --python-path)/lldb"
 	],
 }
 ```
+
+### Resources
+
+- https://lldb.llvm.org/use/variable.html
+- https://melatonin.dev/blog/how-to-create-lldb-type-summaries-and-synthetic-children-for-your-custom-types
