@@ -15,7 +15,7 @@ import enum
 def __lldb_init_module(debugger: lldb.SBDebugger, unused) -> None:
     debugger.HandleCommand("type summary add --python-function odin.pointer_summary --no-value --recognizer-function odin.is_type_pointer")
     debugger.HandleCommand("type summary add --python-function odin.union_summary              --recognizer-function odin.is_type_union")
-    debugger.HandleCommand("type synth   add --python-class    odin.UnionChildProvider         --recognizer-function odin.is_type_union")
+    debugger.HandleCommand("type synth   add --python-class    odin.Union_Children_Provider    --recognizer-function odin.is_type_union")
     debugger.HandleCommand("type summary add --python-function odin.string_summary             --recognizer-function odin.is_type_string")
     debugger.HandleCommand("type synth   add --python-class    odin.SliceChildProvider         --recognizer-function odin.is_type_slice")
     debugger.HandleCommand("type summary add --python-function odin.slice_summary              --recognizer-function odin.is_type_slice")
@@ -64,6 +64,25 @@ def is_type_union  (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == O
 def is_type_proc   (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.PROC
 def is_type_pointer(t: lldb.SBType, _dict) -> bool: return t.is_pointer
 
+
+def type_display(t: lldb.SBType) -> str:
+    name = t.name.replace("::", ".")
+    if t.is_pointer:
+        pointee: lldb.SBType = t.GetPointeeType()
+        if pointee.IsValid():
+            if pointee.name == "void":
+                return "rawptr"
+            return "^"+type_display(pointee)
+        return f"^{name}"
+    if t.is_reference: name = f"&{name}"
+    return name
+
+def value_summary(value: lldb.SBValue) -> str:
+    if not value.IsValid():
+        return "<invalid value>"
+    return value.GetSummary() or value.GetValue() or "<no value>"
+
+
 def slice_summary(value: lldb.SBValue, _dict) -> str:
     value  = value.GetNonSyntheticValue()
     length = value.GetChildMemberWithName("len").unsigned
@@ -74,7 +93,7 @@ def slice_summary(value: lldb.SBValue, _dict) -> str:
 
     return f"[{length}]{type_name}"
 
-class SliceChildProvider:
+class SliceChildProvider(lldb.SBSyntheticValueProvider):
     CHUNK_COUNT = 2000
 
     def __init__(self, val, dict):
@@ -91,30 +110,28 @@ class SliceChildProvider:
         is_chunked       = self.len > SliceChildProvider.CHUNK_COUNT
         self.chunked_len = 0 if not is_chunked else math.ceil(self.len / SliceChildProvider.CHUNK_COUNT)
 
-        return False
-
     def num_children(self):
         return self.chunked_len if self.chunked_len > 0 else self.len
 
-    def get_child_at_index(self, index):
+    def get_child_at_index(self, idx):
         length = self.num_children()
-        assert index >= 0 and index < length
+        assert idx >= 0 and idx < length
 
         first = self.data_val.deref
 
         if self.chunked_len > 0:
             chunk_size = SliceChildProvider.CHUNK_COUNT
 
-            array_len = min(chunk_size, self.len - index * chunk_size)
+            array_len = min(chunk_size, self.len - idx * chunk_size)
             arr_type  = first.type.GetArrayType(array_len)
-            offset    = index * first.size * chunk_size
+            offset    = idx * first.size * chunk_size
 
-            range_start = index * chunk_size
+            range_start = idx * chunk_size
 
             return self.data_val.CreateChildAtOffset(f"[{range_start}..<{range_start+array_len}]", offset, arr_type)
 
-        offset = index * first.size
-        return self.data_val.CreateChildAtOffset(f"[{index}]", offset, first.type)
+        offset = idx * first.size
+        return self.data_val.CreateChildAtOffset(f"[{idx}]", offset, first.type)
 
 def string_summary(value: lldb.SBValue, _dict) -> str | None:
     pointer = value.GetChildMemberWithName("data").GetValueAsUnsigned(0)
@@ -239,38 +256,7 @@ class CellInfo:
         self.elements_per_cell = elements_per_cell
 
 
-class UnionChildProvider:
-    def __init__(self, val, dict):
-        self.val = val
-
-    def update(self):
-        self.children      = self.val.children
-        self.variant_index = self.children[0].unsigned
-        self.is_no_nil     = detect_union_no_nil(self.val.type)
-        
-        return False
-
-    def num_children(self):
-        return len(self.children)-1
-
-    def get_child_at_index(self, index):
-        value = self.val
-
-        variant_index = index+1
-        variant       = self.children[variant_index]
-        name          = variant.type.GetDisplayTypeName()
-        
-        if self.is_no_nil:
-            selected = "*" if self.variant_index == index else ""
-        else:
-            selected = "*" if self.variant_index == variant_index else ""
-
-        field_name = f"{selected}v{variant_index}({name})"
-        c = value.CreateValueFromData(field_name, variant.data, variant.type)
-
-        return c
-
-def detect_union_no_nil(t: lldb.SBType) -> bool:
+def union_is_no_nil(t: lldb.SBType) -> bool:
     """
     normal & #shared_nil union type:
         tag: u64
@@ -291,26 +277,45 @@ def detect_union_no_nil(t: lldb.SBType) -> bool:
         first_variant is not None and first_variant.name == "v0"
     )
 
-def union_summary(v: lldb.SBValue, _dict) -> str:
+def union_variant(v: lldb.SBValue) -> lldb.SBValue | None:
     if v.IsSynthetic():
         v = v.GetNonSyntheticValue()
 
     tag = v.GetChildAtIndex(0)
     assert(tag.name == "tag")
-    
+
     tag_value = tag.unsigned
-    variant_name = f"v{tag_value}"
     
-    is_no_nil = detect_union_no_nil(v.type)
-    
+    is_no_nil = union_is_no_nil(v.type)
+
     if not is_no_nil and tag_value == 0:
-        return "nil"
+        return None
     
-    variant: lldb.SBValue = v.GetChildMemberWithName(variant_name)
-    if not variant.IsValid():
-        return f"<invalid variant {variant_name}, tag={tag_value}, no_nil={is_no_nil}>"
+    return v.GetChildMemberWithName(f"v{tag_value}")
+
+def union_summary(v: lldb.SBValue, _dict) -> str:
+    variant = union_variant(v)
+    if variant is None:
+        return "nil"
 
     return f"{type_display(variant.type)}({value_summary(variant)})"
+
+class Union_Children_Provider(lldb.SBSyntheticValueProvider):
+    def __init__(self, val: lldb.SBValue, _dict) -> None:
+        self.val = val
+
+    def update(self) -> None:
+        self.variant = union_variant(self.val)
+
+    def has_children(self) -> bool:
+        return self.variant is not None
+
+    def num_children(self) -> int:
+        return self.variant.num_children if self.variant else 0
+
+    def get_child_at_index(self, idx) -> lldb.SBValue | None:
+        return self.variant.GetChildAtIndex(idx) if self.variant else None
+
 
 def struct_summary(v: lldb.SBValue, _dict) -> str:
     if v.IsSynthetic():
@@ -328,21 +333,6 @@ def struct_summary(v: lldb.SBValue, _dict) -> str:
 
     output += "}"
     return output
-
-def type_display(t: lldb.SBType) -> str:
-    name = t.name.replace("::", ".")
-    if t.is_pointer:
-        pointee: lldb.SBType = t.GetPointeeType()
-        if pointee.IsValid():
-            if pointee.name == "void":
-                return "rawptr"
-            return "^"+type_display(pointee)
-        return f"^{name}"
-    if t.is_reference: name = f"&{name}"
-    return name
-
-def value_summary(value: lldb.SBValue) -> str:
-    return value.GetSummary() or value.GetValue() or "<no value>"
 
 def correct_proc_type_display(t: lldb.SBType) -> str:
 

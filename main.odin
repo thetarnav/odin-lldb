@@ -5,7 +5,7 @@ import "core:io"
 
 Enum :: enum {One, Two, Three}
 Foo :: struct {foo_name: string, value: int}
-Bar :: struct {bar_name: string, value: int}
+Bar :: struct {value: int, bar_name: string}
 
 Foo_Bar_Union :: union {Foo, Bar, string}
 Foo_Bar_Union_No_Nill :: union #no_nil {Foo, Bar}
@@ -28,9 +28,9 @@ main :: proc () {
 	// (lldb) p foo_raw_ptr
 	// (void *) rawptr(%PTR%)
 
-	bar := Bar{"World", 84}
+	bar := Bar{84, "World"}
 	// (lldb) p bar
-	// (main::Bar) {"World", 84}
+	// (main::Bar) {84, "World"}
 
 	enum_value := Enum.Three
 	// (lldb) p enum_value
@@ -48,9 +48,17 @@ main :: proc () {
 	// (lldb) p foo_bar_union_no_nil
 	// (main::Foo_Bar_Union_No_Nill) main.Foo({"Hello", 42})
 
-	foo_bar_union_shared_nil: Foo_Bar_Union_Shared_Nil = &foo
+	// (lldb) frame variable foo_bar_union_no_nil[0] foo_bar_union_no_nil[1]
+	// (string) foo_bar_union_no_nil[0] = "Hello"
+	// (int) foo_bar_union_no_nil[1] = 42
+
+	foo_bar_union_shared_nil: Foo_Bar_Union_Shared_Nil = &bar
 	// (lldb) p foo_bar_union_shared_nil
-	// (main::Foo_Bar_Union_Shared_Nil) ^main.Foo(&{"Hello", 42})
+	// (main::Foo_Bar_Union_Shared_Nil) ^main.Bar(&{84, "World"})
+
+	// (lldb) frame variable foo_bar_union_shared_nil[0] foo_bar_union_shared_nil[1]
+	// (int) foo_bar_union_shared_nil[0] = 84
+	// (string) foo_bar_union_shared_nil[1] = "World"
 
 	writer := io.Writer{}
 	// (lldb) p writer
