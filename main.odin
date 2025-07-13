@@ -17,9 +17,16 @@ main :: proc () {
 	// (lldb) p foo
 	// (main::Foo) main.Foo{"Hello", 42}
 
+	// (lldb) p foo.foo_name
+	// (string) "Hello"
+
 	foo_ptr := &foo
 	// (lldb) p foo_ptr
 	// (main::Foo *) ^main.Foo{"Hello", 42}
+
+	foo_raw_ptr := rawptr(foo_ptr)
+	// (lldb) p foo_raw_ptr
+	// (void *) rawptr(%PTR%)
 
 	bar := Bar{"World", 84}
 	// (lldb) p bar

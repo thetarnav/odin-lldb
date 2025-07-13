@@ -316,15 +316,26 @@ def struct_summary(v: lldb.SBValue, _dict) -> str:
 
 def type_display(t: lldb.SBType) -> str:
     name = t.name.replace("::", ".")
-    if t.is_pointer:   name = f"^{name}"
+    if t.is_pointer:
+        pointee: lldb.SBType = t.GetPointeeType()
+        if pointee.IsValid():
+            if pointee.name == "void":
+                return "rawptr"
+            return "^"+type_display(pointee)
+        return f"^{name}"
     if t.is_reference: name = f"&{name}"
     return name
 
 
 def pointer_summary(ptr: lldb.SBValue, _dict) -> str:
 
+    # nil pointer
     if ptr.GetValueAsUnsigned() == 0:
         return "nil"
+    
+    # raw pointer
+    if ptr.type.name == "void *":
+        return f"rawptr({ptr.GetValue()})"
 
     pointee: lldb.SBValue = ptr.Dereference()
     if not pointee.IsValid():
