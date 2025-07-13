@@ -36,17 +36,9 @@ def highlight (text: str) -> str: return colored(text, ANSI.BOLD)
 
 
 class TestCase:
-    variable_name: str
-    command: str
-    expected: str
-    
-    def __init__(self, variable_name: str, command: str, expected: str):
-        self.variable_name = variable_name
-        self.command       = command
-        self.expected      = expected
-    
-    def __repr__(self):
-        return f"TestCase({self.variable_name}, '{self.command}', '{self.expected}')"
+    def __init__(self, command: str, expected: str):
+        self.command  = command
+        self.expected = expected
 
 def print_line(msg: str, width: int = 80, color: str = ANSI.CYAN) -> None:
     print(colored(msg.center(width, '-'), color))
@@ -69,26 +61,24 @@ def run_build_script() -> bool:
 def parse_test_cases(filename: str) -> List[TestCase]:
     print(info(f"Parsing test cases from {filename}..."))
     
-    test_cases = []
+    test_cases: List[TestCase] = []
     
     with open(filename, 'r') as f:
         content = f.read()
     
     # Pattern to match:
-    # variable := value
     # // (lldb) command
     # // expected_output
-    pattern = r'(\w+)\s*:?=.*?\n\s*//\s*\(lldb\)\s*(.+?)\n\s*//\s*(.+?)(?=\n|$)'
+    pattern = r'//\s*\(lldb\)\s*(.+?)\n\s*//\s*(.+?)(?=\n|$)'
     
     matches = re.findall(pattern, content, re.MULTILINE | re.DOTALL)
     
     for match in matches:
-        var_name = match[0].strip()
-        command  = match[1].strip()
-        expected = match[2].strip()
-        
-        test_cases.append(TestCase(var_name, command, expected))
-    
+        command  = match[0].strip()
+        expected = match[1].strip()
+
+        test_cases.append(TestCase(command, expected))
+
     print(success(f"Found {len(test_cases)} test cases"))
     return test_cases
 
@@ -179,13 +169,13 @@ def parse_lldb_output(output: str, test_cases: List[TestCase]) -> dict[str, str 
         end_idx   = output.find("\n(lldb) ", start_idx)
 
         if start_idx == -1 or end_idx == -1:
-            results[test_case.variable_name] = None
+            results[test_case.command] = None
             continue
 
         start_from = end_idx+1
         
         test_output = output[start_idx:end_idx].strip()
-        results[test_case.variable_name] = test_output
+        results[test_case.command] = test_output
     
     return results
 
@@ -193,14 +183,14 @@ def parse_lldb_output(output: str, test_cases: List[TestCase]) -> dict[str, str 
 def run_test_case(test_case: TestCase, actual_output: Optional[str]) -> bool:
     """Validate a single test case result."""
     if actual_output is None:
-        print(error(f"  FAIL: {test_case.variable_name} - No output captured"))
+        print(error(f"  FAIL: {test_case.command} - No output captured"))
         return False
     
     if compare_outputs(test_case.expected, actual_output):
-        print(success(f"  PASS: {test_case.variable_name}"))
+        print(success(f"  PASS: {test_case.command}"))
         return True
     else:
-        print(error(f"  FAIL: {test_case.variable_name}"))
+        print(error(f"  FAIL: {test_case.command}"))
         print(f"    {success('Expected:')} {highlight(test_case.expected)}")
         print(f"    {error('Actual:')}   {highlight(actual_output)}")
         return False
@@ -251,7 +241,7 @@ def run_tests() -> bool:
     failed = 0
     
     for test_case in test_cases:
-        actual_output = results.get(test_case.variable_name)
+        actual_output = results.get(test_case.command)
         if not run_test_case(test_case, actual_output):
             failed += 1
     

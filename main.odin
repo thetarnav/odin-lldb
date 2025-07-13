@@ -48,6 +48,9 @@ main :: proc () {
 	writer := io.Writer{}
 	// (lldb) p writer
 	// (io::Stream) io.Stream{nil, nil}
+	
+	// (lldb) p writer.data
+	// (void *) nil
 
 	breakpoint() // for lldb to breakpoint here
 	return
