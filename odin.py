@@ -18,6 +18,7 @@ class Odin_Type(enum.Enum):
     MAP    = "map"
     UNION  = "union"
     STRUCT = "struct"
+    PROC   = "proc"
     OTHER  = "other"
 
 def get_odin_type(t: lldb.SBType) -> Odin_Type:
@@ -30,6 +31,9 @@ def get_odin_type(t: lldb.SBType) -> Odin_Type:
     
     if t.name.startswith("map["):
         return Odin_Type.MAP
+    
+    if t.name.startswith("proc"):
+        return Odin_Type.PROC
     
     if t.type == lldb.eTypeClassUnion:
         tag = t.GetFieldAtIndex(0)
@@ -46,6 +50,7 @@ def is_type_string (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == O
 def is_type_map    (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.MAP
 def is_type_struct (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.STRUCT
 def is_type_union  (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.UNION
+def is_type_proc   (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.PROC
 def is_type_pointer(t: lldb.SBType, _dict) -> bool: return t.is_pointer
 
 def slice_summary(value: lldb.SBValue, _dict) -> str:
@@ -353,9 +358,88 @@ def pointer_summary(ptr: lldb.SBValue, _dict) -> str:
         else:
             return f"{pointee_type}"
 
+def proc_summary(proc_val: lldb.SBValue, _dict) -> str:
+    """Format procedure types in Odin style"""
+    type_name = proc_val.type.name
+    
+    # The type name already contains most of what we need
+    # e.g., "proc(f:^main::Foo,b:main::Bar)->(ok:bool)"
+    # We need to convert it to: "proc (^main.Foo, main.Bar) -> bool"
+    
+    # Extract calling convention if present
+    convention = ""
+    if '"' in type_name:
+        # Handle "contextless" or other conventions
+        conv_start = type_name.find('"')
+        conv_end = type_name.find('"', conv_start + 1)
+        if conv_start != -1 and conv_end != -1:
+            convention = type_name[conv_start:conv_end+1]
+    
+    # Parse parameters and return types
+    # Find the parameter list
+    param_start = type_name.find('(')
+    param_end = type_name.find(')')
+    return_start = type_name.find('->')
+    
+    if param_start == -1 or param_end == -1:
+        return f"proc {convention} <invalid>"
+    
+    params_str = type_name[param_start+1:param_end]
+    
+    # Parse parameters - split by comma but handle nested types
+    params = []
+    if params_str:
+        # Simple split for now - this could be improved to handle complex nested types
+        param_parts = params_str.split(',')
+        for param in param_parts:
+            # Extract type after the colon
+            if ':' in param:
+                param_type = param.split(':', 1)[1].strip()
+                # Convert :: to .
+                param_type = param_type.replace('::', '.')
+                params.append(param_type)
+    
+    # Parse return type
+    return_type = ""
+    if return_start != -1:
+        return_part = type_name[return_start+2:]
+        if return_part.startswith('(') and return_part.endswith(')'):
+            # Multiple return values
+            return_inner = return_part[1:-1]
+            if return_inner:
+                return_parts = return_inner.split(',')
+                return_types = []
+                for ret in return_parts:
+                    if ':' in ret:
+                        ret_type = ret.split(':', 1)[1].strip()
+                        ret_type = ret_type.replace('::', '.')
+                        return_types.append(ret_type)
+                if len(return_types) == 1:
+                    return_type = return_types[0]
+                else:
+                    return_type = f"({', '.join(return_types)})"
+        else:
+            # Single return value
+            if ':' in return_part:
+                return_type = return_part.split(':', 1)[1].strip()
+                return_type = return_type.replace('::', '.')
+    
+    # Build the final string
+    params_formatted = ', '.join(params)
+    if convention:
+        result = f"proc {convention} ({params_formatted})"
+    else:
+        result = f"proc ({params_formatted})"
+    
+    if return_type:
+        result += f" -> {return_type}"
+    
+    return result.replace('  ', ' ').strip()  # Clean up extra spaces
+
 
 def __lldb_init_module(debugger: lldb.SBDebugger, unused) -> None:
     debugger.HandleCommand("type summary add --python-function odin.pointer_summary --no-value --recognizer-function odin.is_type_pointer")
+    debugger.HandleCommand("type summary add --python-function odin.proc_summary    --no-value --recognizer-function odin.is_type_proc")
     debugger.HandleCommand("type summary add --python-function odin.union_summary              --recognizer-function odin.is_type_union")
     debugger.HandleCommand("type synth   add --python-class    odin.UnionChildProvider         --recognizer-function odin.is_type_union")
     debugger.HandleCommand("type summary add --python-function odin.string_summary             --recognizer-function odin.is_type_string")
