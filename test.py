@@ -99,7 +99,7 @@ def compare_outputs(expected: str, actual: str) -> bool:
 
 def run_lldb(test_cases: List[TestCase]) -> str:
 
-    cmd = ["lldb", "main.bin", "-o", "command script import odin.py", "-o", "b breakpoint", "-o", "r", "-o", "up"]
+    cmd = ["lldb", "main.bin", "--no-lldbinit", "-o", "command script import odin.py", "-o", "b breakpoint", "-o", "r", "-o", "up"]
 
     for test_case in test_cases:
         cmd.append("-o")
