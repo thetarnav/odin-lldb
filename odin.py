@@ -308,13 +308,16 @@ class Union_Children_Provider(lldb.SBSyntheticValueProvider):
         self.variant = union_variant(self.val)
 
     def has_children(self) -> bool:
-        return self.variant is not None
+        return self.variant.MightHaveChildren() if self.variant else False
 
     def num_children(self) -> int:
         return self.variant.num_children if self.variant else 0
 
     def get_child_at_index(self, idx) -> lldb.SBValue | None:
         return self.variant.GetChildAtIndex(idx) if self.variant else None
+    
+    def get_child_index(self, name) -> None | int:
+        return self.variant.GetIndexOfChildWithName(name) if self.variant else None
 
 
 def struct_summary(v: lldb.SBValue, _dict) -> str:
