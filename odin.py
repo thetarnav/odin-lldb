@@ -27,7 +27,6 @@ class Odin_Type(enum.Enum):
     SLICE  = "slice"
     STRING = "string" 
     MAP    = "map"
-    UNION  = "union"
     STRUCT = "struct"
     PROC   = "proc"
     OTHER  = "other"
@@ -46,11 +45,6 @@ def get_odin_type(t: lldb.SBType) -> Odin_Type:
     if t.name.startswith("proc"):
         return Odin_Type.PROC
     
-    if t.type == lldb.eTypeClassUnion:
-        tag = t.GetFieldAtIndex(0)
-        if tag and tag.IsValid() and tag.name == "tag":
-            return Odin_Type.UNION
-    
     if t.type == lldb.eTypeClassStruct:
         return Odin_Type.STRUCT
     
@@ -60,10 +54,11 @@ def is_type_slice  (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == O
 def is_type_string (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.STRING
 def is_type_map    (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.MAP
 def is_type_struct (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.STRUCT
-def is_type_union  (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.UNION
 def is_type_proc   (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.PROC
 def is_type_pointer(t: lldb.SBType, _dict) -> bool: return t.is_pointer
 
+def type_get_field_at_idx(t: lldb.SBType, idx: int) -> lldb.SBTypeMember:
+    return t.GetFieldAtIndex(idx)
 
 def type_display(t: lldb.SBType) -> str:
     name = t.name.replace("::", ".")
@@ -271,14 +266,16 @@ class CellInfo:
 #        v1:  T1
 #        ...
 
+def is_type_union  (t: lldb.SBType, _dict) -> bool:
+    if t.type == lldb.eTypeClassUnion:
+        tag = type_get_field_at_idx(t, 0)
+        if tag.IsValid() and tag.name == "tag":
+            return True
+    return False
 
 def union_is_no_nil(t: lldb.SBType) -> bool:
-    field_tag   = t.GetFieldAtIndex(0)
-    field_first = t.GetFieldAtIndex(1)
-    return (
-        field_tag   and field_tag.name   == "tag" and
-        field_first and field_first.name == "v0"
-    )
+    first = type_get_field_at_idx(t, 1)
+    return first.IsValid() and first.name == "v0"
 
 def union_variant(v: lldb.SBValue) -> lldb.SBValue | None:
     if v.IsSynthetic():
