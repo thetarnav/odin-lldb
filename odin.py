@@ -32,21 +32,22 @@ class Odin_Type(enum.Enum):
     OTHER  = "other"
 
 def get_odin_type(t: lldb.SBType) -> Odin_Type:
-
-    if t.name == "string":
-        return Odin_Type.STRING
-    
-    if (t.name.startswith("[]") or t.name.startswith("[dynamic]")) and not t.name.endswith(']'):
-        return Odin_Type.SLICE
-    
-    if t.name.startswith("map["):
-        return Odin_Type.MAP
-    
-    if t.name.startswith("proc"):
-        return Odin_Type.PROC
     
     if t.type == lldb.eTypeClassStruct:
+        if t.name == "string":
+            return Odin_Type.STRING
+        
+        if (t.name.startswith("[]") or t.name.startswith("[dynamic]")) and not t.name.endswith(']'):
+            return Odin_Type.SLICE
+        
+        if t.name.startswith("map["):
+            return Odin_Type.MAP
+
         return Odin_Type.STRUCT
+
+    if t.is_pointer:
+        if t.name.startswith("proc"):
+            return Odin_Type.PROC
     
     return Odin_Type.OTHER
 
