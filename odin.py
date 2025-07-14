@@ -256,25 +256,28 @@ class CellInfo:
         self.elements_per_cell = elements_per_cell
 
 
-def union_is_no_nil(t: lldb.SBType) -> bool:
-    """
-    normal & #shared_nil union type:
-        tag: u64
-        v1:  T0
-        v2:  T1
-        ...
-    #no_nil union type:
-        tag: u64
-        v0:  T0
-        v1:  T1
-        ...
-    """
-    tag_field = t.GetFieldAtIndex(0)
-    first_variant = t.GetFieldAtIndex(1)
+# ------------------------------------------------------------------------------
+# Union Values
 
+# Layout:
+#    normal & #shared_nil union type:
+#        tag: u64
+#        v1:  T0
+#        v2:  T1
+#        ...
+#    #no_nil union type:
+#        tag: u64
+#        v0:  T0
+#        v1:  T1
+#        ...
+
+
+def union_is_no_nil(t: lldb.SBType) -> bool:
+    field_tag   = t.GetFieldAtIndex(0)
+    field_first = t.GetFieldAtIndex(1)
     return (
-        tag_field is not None and tag_field.name == "tag" and
-        first_variant is not None and first_variant.name == "v0"
+        field_tag   and field_tag.name   == "tag" and
+        field_first and field_first.name == "v0"
     )
 
 def union_variant(v: lldb.SBValue) -> lldb.SBValue | None:
