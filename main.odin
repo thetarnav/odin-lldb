@@ -86,6 +86,22 @@ main :: proc () {
 	// (lldb) p foo_bar_contextless
 	// (proc"contextless"(f:main::Foo,b:main::Bar)->(idx:int,ok:bool)) proc "c" (main.Foo, main.Bar, int) -> bool
 
+	foo_slice := []Foo{{"Slice1", 1}, {"Slice2", 2}}
+	// (lldb) p foo_slice
+	// ([]main::Foo) [2]{{"Slice1", 1}, {"Slice2", 2}}
+
+	// (lldb) frame variable foo_slice[0] foo_slice[1]
+	// (main::Foo) foo_slice[0] = {"Slice1", 1}
+	// (main::Foo) foo_slice[1] = {"Slice2", 2}
+
+	foo_long_slice := []Foo{{"Slice1", 1}, {"Slice2", 2}, {"Slice3", 3}, {"Slice4", 4}, {"Slice5", 5}}
+	// (lldb) p foo_long_slice
+	// ([]main::Foo) [5]{{"Slice1", 1}, {"Slice2", 2}, {"Slice3", 3}...}
+
+	slice_empty := []Foo{}
+	// (lldb) p slice_empty
+	// ([]main::Foo) [0]{}
+
 	breakpoint() // for lldb to breakpoint here
 	return
 }

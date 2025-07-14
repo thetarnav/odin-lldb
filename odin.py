@@ -17,7 +17,7 @@ def __lldb_init_module(debugger: lldb.SBDebugger, unused) -> None:
     debugger.HandleCommand("type summary add --python-function odin.union_summary              --recognizer-function odin.is_type_union")
     debugger.HandleCommand("type synth   add --python-class    odin.Union_Children_Provider    --recognizer-function odin.is_type_union")
     debugger.HandleCommand("type summary add --python-function odin.string_summary             --recognizer-function odin.is_type_string")
-    debugger.HandleCommand("type synth   add --python-class    odin.SliceChildProvider         --recognizer-function odin.is_type_slice")
+    debugger.HandleCommand("type synth   add --python-class    odin.Slice_Children_Provider    --recognizer-function odin.is_type_slice")
     debugger.HandleCommand("type summary add --python-function odin.slice_summary              --recognizer-function odin.is_type_slice")
     debugger.HandleCommand("type synth   add --python-class    odin.MapChildProvider           --recognizer-function odin.is_type_map")
     debugger.HandleCommand("type summary add --python-function odin.struct_summary             --recognizer-function odin.is_type_struct")
@@ -57,8 +57,14 @@ def is_type_struct (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == O
 def is_type_proc   (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.PROC
 def is_type_pointer(t: lldb.SBType, _dict) -> bool: return t.is_pointer
 
-def type_get_field_at_idx(t: lldb.SBType, idx: int) -> lldb.SBTypeMember:
+def type_get_field_at(t: lldb.SBType, idx: int) -> lldb.SBTypeMember:
     return t.GetFieldAtIndex(idx)
+
+def value_get_field_at(v: lldb.SBValue, idx: int) -> lldb.SBValue:
+    return v.GetChildAtIndex(idx)
+
+def value_get_field(v: lldb.SBValue, name: str) -> lldb.SBValue:
+    return v.GetChildMemberWithName(name)
 
 def type_display(t: lldb.SBType) -> str:
     name = t.name.replace("::", ".")
@@ -77,45 +83,62 @@ def value_summary(value: lldb.SBValue) -> str:
         return "<invalid value>"
     return value.GetSummary() or value.GetValue() or "<no value>"
 
+# ------------------------------------------------------------------------------
+# Slice Values
 
-def slice_summary(value: lldb.SBValue, _dict) -> str:
-    value  = value.GetNonSyntheticValue()
-    length = value.GetChildMemberWithName("len").unsigned
-    data   = value.GetChildMemberWithName("data")
+SLICE_SUMMARY_MAX_LENGTH = 50
+SLICE_CHUNK_COUNT        = 2000
 
-    pointee   = data.deref
-    type_name = pointee.type.GetDisplayTypeName()
+def slice_summary(v: lldb.SBValue, _dict) -> str:
 
-    return f"[{length}]{type_name}"
+    length = value_get_field(v.GetNonSyntheticValue(), "len").unsigned
+    data   = value_get_field(v.GetNonSyntheticValue(), "data")
 
-class SliceChildProvider(lldb.SBSyntheticValueProvider):
-    CHUNK_COUNT = 2000
+    pointee = data.deref
+    
+    summary = f"[{length}]{{"
+    
+    for i in range(length):
+        item = data.CreateChildAtOffset(f"[{i}]", i * pointee.size, pointee.type)
+        item_summary = value_summary(item)
+        
+        separator = ", " if i > 0 else ""
+        new_length = len(summary) + len(separator) + len(item_summary)
+        
+        if new_length > SLICE_SUMMARY_MAX_LENGTH and i > 0:
+            summary += "..."
+            break
 
-    def __init__(self, val, dict):
+        summary += separator + item_summary
+
+    return summary + "}"
+
+class Slice_Children_Provider(lldb.SBSyntheticValueProvider):
+
+    def __init__(self, val, dict) -> None:
         self.val = val
-        self.update()
 
-    def update(self):
+    def update(self) -> None:
         val = self.val
 
-        self.len        = val.GetChildMemberWithName("len").unsigned
-        self.data_val   = val.GetChildMemberWithName("data")
+        self.len      = value_get_field(val, "len").unsigned
+        self.data_val = value_get_field(val, "data")
         assert self.data_val.type.is_pointer
 
-        is_chunked       = self.len > SliceChildProvider.CHUNK_COUNT
-        self.chunked_len = 0 if not is_chunked else math.ceil(self.len / SliceChildProvider.CHUNK_COUNT)
+        is_chunked       = self.len > SLICE_CHUNK_COUNT
+        self.chunked_len = 0 if not is_chunked else math.ceil(self.len / SLICE_CHUNK_COUNT)
 
-    def num_children(self):
+    def num_children(self) -> int:
         return self.chunked_len if self.chunked_len > 0 else self.len
 
-    def get_child_at_index(self, idx):
+    def get_child_at_index(self, idx: int) -> lldb.SBValue:
         length = self.num_children()
         assert idx >= 0 and idx < length
 
         first = self.data_val.deref
 
         if self.chunked_len > 0:
-            chunk_size = SliceChildProvider.CHUNK_COUNT
+            chunk_size = SLICE_CHUNK_COUNT
 
             array_len = min(chunk_size, self.len - idx * chunk_size)
             arr_type  = first.type.GetArrayType(array_len)
@@ -137,6 +160,9 @@ def string_summary(value: lldb.SBValue, _dict) -> str | None:
         return '""'
     error = lldb.SBError()
     string_data = value.process.ReadMemory(pointer, length, error)
+    if not error.success:
+        print(f"Error reading string data: {error}")
+        return None
     return '"{}"'.format(string_data.decode("utf-8"))
 
 class MapChildProvider:
@@ -268,13 +294,13 @@ class CellInfo:
 
 def is_type_union  (t: lldb.SBType, _dict) -> bool:
     if t.type == lldb.eTypeClassUnion:
-        tag = type_get_field_at_idx(t, 0)
+        tag = type_get_field_at(t, 0)
         if tag.IsValid() and tag.name == "tag":
             return True
     return False
 
 def union_is_no_nil(t: lldb.SBType) -> bool:
-    first = type_get_field_at_idx(t, 1)
+    first = type_get_field_at(t, 1)
     return first.IsValid() and first.name == "v0"
 
 def union_variant(v: lldb.SBValue) -> lldb.SBValue | None:
