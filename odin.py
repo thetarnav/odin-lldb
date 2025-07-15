@@ -24,12 +24,12 @@ def __lldb_init_module(debugger: lldb.SBDebugger, unused) -> None:
 
 
 class Odin_Type(enum.Enum):
-    SLICE  = "slice"
-    STRING = "string" 
-    MAP    = "map"
-    STRUCT = "struct"
-    PROC   = "proc"
-    OTHER  = "other"
+    SLICE   = "slice"
+    STRING  = "string" 
+    MAP     = "map"
+    STRUCT  = "struct"
+    PTR     = "pointer"
+    OTHER   = "other"
 
 def get_odin_type(t: lldb.SBType) -> Odin_Type:
     
@@ -46,8 +46,7 @@ def get_odin_type(t: lldb.SBType) -> Odin_Type:
         return Odin_Type.STRUCT
 
     if t.is_pointer:
-        if t.name.startswith("proc"):
-            return Odin_Type.PROC
+        return Odin_Type.PTR
     
     return Odin_Type.OTHER
 
@@ -55,8 +54,7 @@ def is_type_slice  (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == O
 def is_type_string (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.STRING
 def is_type_map    (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.MAP
 def is_type_struct (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.STRUCT
-def is_type_proc   (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.PROC
-def is_type_pointer(t: lldb.SBType, _dict) -> bool: return t.is_pointer
+def is_type_pointer(t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.PTR
 
 def type_get_field_at(t: lldb.SBType, idx: int) -> lldb.SBTypeMember:
     return t.GetFieldAtIndex(idx)
