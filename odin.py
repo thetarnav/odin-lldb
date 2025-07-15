@@ -10,6 +10,7 @@ Repository: https://github.com/thetarnav/odin-lldb
 import lldb
 import math
 import enum
+from collections.abc import Callable
 
 
 def __lldb_init_module(debugger: lldb.SBDebugger, unused) -> None:
@@ -19,12 +20,14 @@ def __lldb_init_module(debugger: lldb.SBDebugger, unused) -> None:
     debugger.HandleCommand("type summary add --python-function odin.string_summary             --recognizer-function odin.is_type_string")
     debugger.HandleCommand("type synth   add --python-class    odin.Slice_Children_Provider    --recognizer-function odin.is_type_slice")
     debugger.HandleCommand("type summary add --python-function odin.slice_summary              --recognizer-function odin.is_type_slice")
+    debugger.HandleCommand("type summary add --python-function odin.array_summary              --recognizer-function odin.is_type_array")
     debugger.HandleCommand("type synth   add --python-class    odin.MapChildProvider           --recognizer-function odin.is_type_map")
     debugger.HandleCommand("type summary add --python-function odin.struct_summary             --recognizer-function odin.is_type_struct")
 
 
 class Odin_Type(enum.Enum):
     SLICE   = "slice"
+    ARRAY   = "array"
     STRING  = "string" 
     MAP     = "map"
     STRUCT  = "struct"
@@ -37,13 +40,19 @@ def get_odin_type(t: lldb.SBType) -> Odin_Type:
         if t.name == "string":
             return Odin_Type.STRING
         
-        if (t.name.startswith("[]") or t.name.startswith("[dynamic]")) and not t.name.endswith(']'):
+        if (
+            (t.name.startswith("[]") or t.name.startswith("[dynamic]")) and
+            not t.name.endswith(']')
+        ):
             return Odin_Type.SLICE
         
         if t.name.startswith("map["):
             return Odin_Type.MAP
 
         return Odin_Type.STRUCT
+
+    if t.type == lldb.eTypeClassArray:
+        return Odin_Type.ARRAY
 
     if t.is_pointer:
         return Odin_Type.PTR
@@ -55,6 +64,7 @@ def is_type_string (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == O
 def is_type_map    (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.MAP
 def is_type_struct (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.STRUCT
 def is_type_pointer(t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.PTR
+def is_type_array  (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.ARRAY
 
 def type_get_field_at(t: lldb.SBType, idx: int) -> lldb.SBTypeMember:
     return t.GetFieldAtIndex(idx)
@@ -82,35 +92,48 @@ def value_summary(value: lldb.SBValue) -> str:
         return "<invalid value>"
     return value.GetSummary() or value.GetValue() or "<no value>"
 
-# ------------------------------------------------------------------------------
-# Slice Values
+AGGREGATE_SUMMARY_MAX_LENGTH = 50
+SLICE_CHUNK_COUNT            = 2000
 
-SLICE_SUMMARY_MAX_LENGTH = 50
-SLICE_CHUNK_COUNT        = 2000
-
-def slice_summary(v: lldb.SBValue, _dict) -> str:
-
-    length = value_get_field(v.GetNonSyntheticValue(), "len").unsigned
-    data   = value_get_field(v.GetNonSyntheticValue(), "data")
-
-    pointee = data.deref
-    
-    summary = f"[{length}]{{"
+def aggregate_value_summary(
+    prefix:    str,
+    suffix:    str,
+    get_value: Callable[[int], lldb.SBValue],
+    length:    int,
+) -> str:
+    summary = prefix
     
     for i in range(length):
-        item = data.CreateChildAtOffset(f"[{i}]", i * pointee.size, pointee.type)
+        item = get_value(i)
         item_summary = value_summary(item)
         
         separator = ", " if i > 0 else ""
-        new_length = len(summary) + len(separator) + len(item_summary)
-        
-        if new_length > SLICE_SUMMARY_MAX_LENGTH and i > 0:
+        new_length = len(summary) + len(separator) + len(item_summary) + len(suffix)
+
+        if new_length > AGGREGATE_SUMMARY_MAX_LENGTH and i > 0:
             summary += "..."
             break
 
         summary += separator + item_summary
 
-    return summary + "}"
+    return summary + suffix
+
+
+# ------------------------------------------------------------------------------
+# Slice Values
+
+def slice_summary(v: lldb.SBValue, _dict) -> str:
+    v = v.GetNonSyntheticValue() if v.IsSynthetic() else v
+
+    length = value_get_field(v, "len").unsigned
+    data   = value_get_field(v, "data")
+
+    pointee = data.deref
+
+    return aggregate_value_summary(f"[{length}]{{", "}",
+        get_value=lambda i: data.CreateChildAtOffset(f"[{i}]", i * pointee.size, pointee.type),
+        length=length,
+    )
 
 class Slice_Children_Provider(lldb.SBSyntheticValueProvider):
 
@@ -149,6 +172,22 @@ class Slice_Children_Provider(lldb.SBSyntheticValueProvider):
 
         offset = idx * first.size
         return self.data_val.CreateChildAtOffset(f"[{idx}]", offset, first.type)
+
+
+# ------------------------------------------------------------------------------
+# Array Values
+
+def array_summary(v: lldb.SBValue, _dict) -> str:
+    length = v.num_children
+
+    return aggregate_value_summary(f"[{length}]{{", "}",
+        get_value=lambda i: v.GetChildAtIndex(i),
+        length=length,
+    )
+
+
+# ------------------------------------------------------------------------------
+# String Values
 
 def string_summary(value: lldb.SBValue, _dict) -> str | None:
     pointer = value.GetChildMemberWithName("data").GetValueAsUnsigned(0)

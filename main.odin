@@ -86,21 +86,37 @@ main :: proc () {
 	// (lldb) p foo_bar_contextless
 	// (proc"contextless"(f:main::Foo,b:main::Bar)->(idx:int,ok:bool)) proc "c" (main.Foo, main.Bar, int) -> bool
 
-	foo_slice := []Foo{{"Slice1", 1}, {"Slice2", 2}}
-	// (lldb) p foo_slice
+	slice := []Foo{{"Slice1", 1}, {"Slice2", 2}}
+	// (lldb) p slice
 	// ([]main::Foo) [2]{{"Slice1", 1}, {"Slice2", 2}}
 
-	// (lldb) frame variable foo_slice[0] foo_slice[1]
-	// (main::Foo) foo_slice[0] = {"Slice1", 1}
-	// (main::Foo) foo_slice[1] = {"Slice2", 2}
+	// (lldb) frame variable slice[0] slice[1]
+	// (main::Foo) slice[0] = {"Slice1", 1}
+	// (main::Foo) slice[1] = {"Slice2", 2}
 
-	foo_long_slice := []Foo{{"Slice1", 1}, {"Slice2", 2}, {"Slice3", 3}, {"Slice4", 4}, {"Slice5", 5}}
-	// (lldb) p foo_long_slice
+	long_slice := []Foo{{"Slice1", 1}, {"Slice2", 2}, {"Slice3", 3}, {"Slice4", 4}, {"Slice5", 5}}
+	// (lldb) p long_slice
 	// ([]main::Foo) [5]{{"Slice1", 1}, {"Slice2", 2}, {"Slice3", 3}...}
 
 	slice_empty := []Foo{}
 	// (lldb) p slice_empty
 	// ([]main::Foo) [0]{}
+
+	array := [2]Foo{{"Array1", 1}, {"Array2", 2}}
+	// (lldb) p array
+	// (main::Foo[2]) [2]{{"Array1", 1}, {"Array2", 2}}
+
+	// (lldb) frame variable array[0] array[1]
+	// (main::Foo) array[0] = {"Array1", 1}
+	// (main::Foo) array[1] = {"Array2", 2}
+
+	long_array := [5]Foo{{"Array1", 1}, {"Array2", 2}, {"Array3", 3}, {"Array4", 4}, {"Array5", 5}}
+	// (lldb) p long_array
+	// (main::Foo[5]) [5]{{"Array1", 1}, {"Array2", 2}, {"Array3", 3}...}
+
+	array_empty := [0]Foo{}
+	// (lldb) p array_empty
+	// (main::Foo[]) [0]{}
 
 	breakpoint() // for lldb to breakpoint here
 	return
