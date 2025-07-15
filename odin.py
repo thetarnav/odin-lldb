@@ -268,26 +268,26 @@ class MapChildProvider:
         return (self.val.GetChildMemberWithName("len").GetValueAsSigned() * 2) + 1
 
     def get_child_at_index(self, index):
-        data = self.val.GetChildMemberWithName("data")
-        tkey = data.GetChildMemberWithName("key").type
-        tval = data.GetChildMemberWithName("value").type
+        data       = self.val.GetChildMemberWithName("data")
+        tkey       = data.GetChildMemberWithName("key").type
+        tval       = data.GetChildMemberWithName("value").type
         hash_field = data.GetChildMemberWithName("hash")
         key_cell   = data.GetChildMemberWithName("key_cell")
         value_cell = data.GetChildMemberWithName("value_cell")
 
-        raw_data = data.GetValueAsUnsigned()
-        key_ptr = raw_data & ~63
-        cap_log2 = raw_data & 63
-        cap = 0 if cap_log2 <= 0 else 1 << cap_log2
+        raw_data   = data.GetValueAsUnsigned()
+        key_ptr    = raw_data & ~63
+        cap_log2   = raw_data & 63
+        cap        = 0 if cap_log2 <= 0 else 1 << cap_log2
 
-        key_cell_info = self.cell_info(tkey, key_cell)
-        value_cell_info = self.cell_info(tval, value_cell)
+        key_cell_info   = cell_info(tkey, key_cell)
+        value_cell_info = cell_info(tval, value_cell)
 
         size_of_hash = hash_field.size
         assert size_of_hash == 8
     
-        value_ptr = self.cell_index(key_ptr, key_cell_info, cap)
-        hash_ptr =  self.cell_index(value_ptr, value_cell_info, cap)
+        value_ptr = cell_index(key_ptr, key_cell_info, cap)
+        hash_ptr  = cell_index(value_ptr, value_cell_info, cap)
 
         error = lldb.SBError()
 
@@ -312,8 +312,8 @@ class MapChildProvider:
             elif hash_val == 0 or (hash_val & tombstone_mask) != 0:
                 continue
 
-            offset_key   = self.cell_index(key_ptr, key_cell_info, i)
-            offset_value = self.cell_index(value_ptr, value_cell_info, i)
+            offset_key   = cell_index(key_ptr, key_cell_info, i)
+            offset_value = cell_index(value_ptr, value_cell_info, i)
 
             if index == key_index:
                 if wants_key:
@@ -325,49 +325,49 @@ class MapChildProvider:
 
         print("not found")
 
-    def cell_info(self, typev, cell_type):
-        elements_per_cell = 0
+def cell_info(typev, cell_type) -> 'CellInfo':
+    elements_per_cell = 0
 
-        if typev.size != cell_type.size:
-            array_type = cell_type.children[0].type
-            if array_type.size > 0 and typev.size > 0:
-                elements_per_cell = array_type.size / typev.size
+    if typev.size != cell_type.size:
+        array_type = cell_type.children[0].type
+        if array_type.size > 0 and typev.size > 0:
+            elements_per_cell = array_type.size / typev.size
 
-        if elements_per_cell == 0:
-            elements_per_cell = 1
+    if elements_per_cell == 0:
+        elements_per_cell = 1
 
-        return CellInfo(typev.size, cell_type.size, elements_per_cell)
+    return CellInfo(typev.size, cell_type.size, elements_per_cell)
 
-    def cell_index(self, base, info, index):
-        cell_index = 0
-        data_index = 0
-        if info.elements_per_cell == 1:
-            return base + (index * info.size_of_cell)
-        elif info.elements_per_cell == 2:
-            cell_index = index >> 1;
-            data_index = index & 1;
-        elif info.elements_per_cell == 4:
-            cell_index = index >> 2;
-            data_index = index & 3;
-        elif info.elements_per_cell == 8:
-            cell_index = index >> 3;
-            data_index = index & 7;
-        elif info.elements_per_cell == 16:
-            cell_index = index >> 4;
-            data_index = index & 15;
-        elif info.elements_per_cell == 32:
-            cell_index = index >> 5;
-            data_index = index & 31;
-        else:
-            cell_index = index / info.elements_per_cell;
-            data_index = index % info.elements_per_cell;
+def cell_index(base: int, info: "CellInfo", index: int) -> int:
+    cell_index = 0
+    data_index = 0
+    if info.elements_per_cell == 1:
+        return base + (index * info.size_of_cell)
+    elif info.elements_per_cell == 2:
+        cell_index = index >> 1;
+        data_index = index & 1;
+    elif info.elements_per_cell == 4:
+        cell_index = index >> 2;
+        data_index = index & 3;
+    elif info.elements_per_cell == 8:
+        cell_index = index >> 3;
+        data_index = index & 7;
+    elif info.elements_per_cell == 16:
+        cell_index = index >> 4;
+        data_index = index & 15;
+    elif info.elements_per_cell == 32:
+        cell_index = index >> 5;
+        data_index = index & 31;
+    else:
+        cell_index = index // info.elements_per_cell;
+        data_index = index % info.elements_per_cell;
 
-        return base + (cell_index * info.size_of_cell) + (data_index * info.size_of_type);
+    return base + (cell_index * info.size_of_cell) + (data_index * info.size_of_type);
 
 class CellInfo:
-    def __init__(self, size_of_type, size_of_cell, elements_per_cell):
-        self.size_of_type = size_of_type
-        self.size_of_cell = size_of_cell
+    def __init__(self, size_of_type: int, size_of_cell: int, elements_per_cell: int) -> None:
+        self.size_of_type      = size_of_type
+        self.size_of_cell      = size_of_cell
         self.elements_per_cell = elements_per_cell
 
 
