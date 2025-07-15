@@ -140,12 +140,12 @@ main :: proc () {
 	// ([dynamic]main::Foo) [10000]{{"DynamicChunked", 0}...}
 
 	// (lldb) frame variable dynamic_array_chunked[0] dynamic_array_chunked[0][0]
-	// (main::Foo[2000]) dynamic_array_chunked[0] = [2000]{{"DynamicChunked", 0}...}
+	// (main::Foo[1000]) dynamic_array_chunked[0] = [1000]{{"DynamicChunked", 0}...}
 	// (main::Foo) dynamic_array_chunked[0][0] = {"DynamicChunked", 0}
 
 	// (lldb) frame variable dynamic_array_chunked[1] dynamic_array_chunked[1][0]
-	// (main::Foo[2000]) dynamic_array_chunked[1] = [2000]{{"DynamicChunked", 2000}...}
-	// (main::Foo) dynamic_array_chunked[1][0] = {"DynamicChunked", 2000}
+	// (main::Foo[1000]) dynamic_array_chunked[1] = [1000]{{"DynamicChunked", 1000}...}
+	// (main::Foo) dynamic_array_chunked[1][0] = {"DynamicChunked", 1000}
 
 	breakpoint() // for lldb to breakpoint here
 	return

@@ -92,8 +92,8 @@ def value_summary(value: lldb.SBValue) -> str:
         return "<invalid value>"
     return value.GetSummary() or value.GetValue() or "<no value>"
 
-AGGREGATE_SUMMARY_MAX_LENGTH = 50
-SLICE_CHUNK_COUNT            = 2000
+AGGREGATE_SUMMARY_MAX_LEN = 50
+SLICE_CHUNK_SIZE          = 1000
 
 def aggregate_value_summary(
     prefix:    str,
@@ -110,7 +110,7 @@ def aggregate_value_summary(
         separator = ", " if i > 0 else ""
         new_length = len(summary) + len(separator) + len(item_summary) + len(suffix)
 
-        if new_length > AGGREGATE_SUMMARY_MAX_LENGTH and i > 0:
+        if new_length > AGGREGATE_SUMMARY_MAX_LEN and i > 0:
             summary += "..."
             break
 
@@ -151,9 +151,9 @@ def slice_summary(v: lldb.SBValue, _dict) -> str:
     length = get_len(v)
 
     # GetChildAtIndex goes through Slice_Children_Provider
-    if length > SLICE_CHUNK_COUNT:
-        get_value = lambda i: v.GetChildAtIndex(i // SLICE_CHUNK_COUNT) \
-                               .GetChildAtIndex(i % SLICE_CHUNK_COUNT)
+    if length > SLICE_CHUNK_SIZE:
+        get_value = lambda i: v.GetChildAtIndex(i // SLICE_CHUNK_SIZE) \
+                               .GetChildAtIndex(i % SLICE_CHUNK_SIZE)
     else:
         get_value = lambda i: v.GetChildAtIndex(i)
 
@@ -169,7 +169,7 @@ class Slice_Children_Provider(lldb.SBSyntheticValueProvider):
         self.data = get_data(self.val)
         assert self.data.type.is_pointer
 
-        self.chunked_len = 0 if not self.len > SLICE_CHUNK_COUNT else math.ceil(self.len / SLICE_CHUNK_COUNT)
+        self.chunked_len = 0 if not self.len > SLICE_CHUNK_SIZE else math.ceil(self.len / SLICE_CHUNK_SIZE)
 
     def has_children(self) -> bool:
         return self.len > 0
@@ -184,10 +184,10 @@ class Slice_Children_Provider(lldb.SBSyntheticValueProvider):
         pointee = self.data.deref
 
         if self.chunked_len > 0:
-            array_len   = min(SLICE_CHUNK_COUNT, self.len - idx * SLICE_CHUNK_COUNT)
-            range_start = idx * SLICE_CHUNK_COUNT
+            array_len   = min(SLICE_CHUNK_SIZE, self.len - idx * SLICE_CHUNK_SIZE)
+            range_start = idx * SLICE_CHUNK_SIZE
             name        = f"[{range_start}..<{range_start+array_len}]"
-            offset      = idx * pointee.size * SLICE_CHUNK_COUNT
+            offset      = idx * pointee.size * SLICE_CHUNK_SIZE
             type        = pointee.type.GetArrayType(array_len)
         else:
             name        = f"[{idx}]"
