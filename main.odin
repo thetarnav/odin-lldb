@@ -1,3 +1,4 @@
+#+feature dynamic-literals
 package main
 
 import "core:fmt"
@@ -94,8 +95,8 @@ main :: proc () {
 	// (main::Foo) slice[0] = {"Slice1", 1}
 	// (main::Foo) slice[1] = {"Slice2", 2}
 
-	long_slice := []Foo{{"Slice1", 1}, {"Slice2", 2}, {"Slice3", 3}, {"Slice4", 4}, {"Slice5", 5}}
-	// (lldb) p long_slice
+	slice_long := []Foo{{"Slice1", 1}, {"Slice2", 2}, {"Slice3", 3}, {"Slice4", 4}, {"Slice5", 5}}
+	// (lldb) p slice_long
 	// ([]main::Foo) [5]{{"Slice1", 1}, {"Slice2", 2}, {"Slice3", 3}...}
 
 	slice_empty := []Foo{}
@@ -110,13 +111,41 @@ main :: proc () {
 	// (main::Foo) array[0] = {"Array1", 1}
 	// (main::Foo) array[1] = {"Array2", 2}
 
-	long_array := [5]Foo{{"Array1", 1}, {"Array2", 2}, {"Array3", 3}, {"Array4", 4}, {"Array5", 5}}
-	// (lldb) p long_array
+	array_long := [5]Foo{{"Array1", 1}, {"Array2", 2}, {"Array3", 3}, {"Array4", 4}, {"Array5", 5}}
+	// (lldb) p array_long
 	// (main::Foo[5]) [5]{{"Array1", 1}, {"Array2", 2}, {"Array3", 3}...}
 
 	array_empty := [0]Foo{}
 	// (lldb) p array_empty
 	// (main::Foo[]) [0]{}
+
+	dynamic_array := [dynamic]Foo{Foo{"Dynamic1", 1}, Foo{"Dynamic2", 2}}
+	// (lldb) p dynamic_array
+	// ([dynamic]main::Foo) [2]{{"Dynamic1", 1}, {"Dynamic2", 2}}
+
+	// (lldb) frame variable dynamic_array[0] dynamic_array[1]
+	// (main::Foo) dynamic_array[0] = {"Dynamic1", 1}
+	// (main::Foo) dynamic_array[1] = {"Dynamic2", 2}
+
+	dynamic_array_long := [dynamic]Foo{Foo{"Dynamic1", 1}, Foo{"Dynamic2", 2}, Foo{"Dynamic3", 3}, Foo{"Dynamic4", 4}, Foo{"Dynamic5", 5}}
+	// (lldb) p dynamic_array_long
+	// ([dynamic]main::Foo) [5]{{"Dynamic1", 1}, {"Dynamic2", 2}...}
+
+	dynamic_array_chunked: [dynamic]Foo
+	for i in 0..<10_000 {
+		append(&dynamic_array_chunked, Foo{"DynamicChunked", i})
+	}
+
+	// (lldb) p dynamic_array_chunked
+	// ([dynamic]main::Foo) [10000]{{"DynamicChunked", 0}...}
+
+	// (lldb) frame variable dynamic_array_chunked[0] dynamic_array_chunked[0][0]
+	// (main::Foo[2000]) dynamic_array_chunked[0] = [2000]{{"DynamicChunked", 0}...}
+	// (main::Foo) dynamic_array_chunked[0][0] = {"DynamicChunked", 0}
+
+	// (lldb) frame variable dynamic_array_chunked[1] dynamic_array_chunked[1][0]
+	// (main::Foo[2000]) dynamic_array_chunked[1] = [2000]{{"DynamicChunked", 2000}...}
+	// (main::Foo) dynamic_array_chunked[1][0] = {"DynamicChunked", 2000}
 
 	breakpoint() // for lldb to breakpoint here
 	return

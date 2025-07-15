@@ -69,10 +69,10 @@ def is_type_array  (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == O
 def type_get_field_at(t: lldb.SBType, idx: int) -> lldb.SBTypeMember:
     return t.GetFieldAtIndex(idx)
 
-def value_get_field_at(v: lldb.SBValue, idx: int) -> lldb.SBValue:
+def value_get_child_at(v: lldb.SBValue, idx: int) -> lldb.SBValue:
     return v.GetChildAtIndex(idx)
 
-def value_get_field(v: lldb.SBValue, name: str) -> lldb.SBValue:
+def value_get_child(v: lldb.SBValue, name: str) -> lldb.SBValue:
     return v.GetChildMemberWithName(name)
 
 def type_display(t: lldb.SBType) -> str:
@@ -121,34 +121,58 @@ def aggregate_value_summary(
 
 # ------------------------------------------------------------------------------
 # Slice Values
+# 
+# handles both slices and dynamic arrays
+# since the layout is the same:
+# 
+#    Raw_Slice :: struct($T: typeid) {
+#        len:  int,
+#        data: ^T,
+#    }
+# 
+#    Raw_Dynamic_Array :: struct($T: typeid) {
+#        len:       int,
+#        data:      ^T,
+#        cap:       int,
+#        allocator: ^runtime.Allocator,
+#    }
+
+def get_len(v: lldb.SBValue) -> int:
+    return value_get_child(v.GetNonSyntheticValue(), "len").signed
+
+def get_cap(v: lldb.SBValue) -> int:
+    return value_get_child(v.GetNonSyntheticValue(), "cap").signed
+
+def get_data(v: lldb.SBValue) -> lldb.SBValue:
+    return value_get_child(v.GetNonSyntheticValue(), "data")
 
 def slice_summary(v: lldb.SBValue, _dict) -> str:
-    v = v.GetNonSyntheticValue() if v.IsSynthetic() else v
 
-    length = value_get_field(v, "len").unsigned
-    data   = value_get_field(v, "data")
+    length = get_len(v)
 
-    pointee = data.deref
+    # GetChildAtIndex goes through Slice_Children_Provider
+    if length > SLICE_CHUNK_COUNT:
+        get_value = lambda i: v.GetChildAtIndex(i // SLICE_CHUNK_COUNT) \
+                               .GetChildAtIndex(i % SLICE_CHUNK_COUNT)
+    else:
+        get_value = lambda i: v.GetChildAtIndex(i)
 
-    return aggregate_value_summary(f"[{length}]{{", "}",
-        get_value=lambda i: data.CreateChildAtOffset(f"[{i}]", i * pointee.size, pointee.type),
-        length=length,
-    )
+    return aggregate_value_summary(f"[{length}]{{", "}", get_value, length)
 
 class Slice_Children_Provider(lldb.SBSyntheticValueProvider):
 
-    def __init__(self, val, dict) -> None:
+    def __init__(self, val: lldb.SBValue, _dict) -> None:
         self.val = val
 
     def update(self) -> None:
-        val = self.val
+        self.len  = get_len(self.val)
+        self.data = get_data(self.val)
+        assert self.data.type.is_pointer
 
-        self.len      = value_get_field(val, "len").unsigned
-        self.data_val = value_get_field(val, "data")
-        assert self.data_val.type.is_pointer
+        self.chunked_len = 0 if not self.len > SLICE_CHUNK_COUNT else math.ceil(self.len / SLICE_CHUNK_COUNT)
 
-        is_chunked       = self.len > SLICE_CHUNK_COUNT
-        self.chunked_len = 0 if not is_chunked else math.ceil(self.len / SLICE_CHUNK_COUNT)
+    def has_children(self) -> bool:
+        return self.len > 0
 
     def num_children(self) -> int:
         return self.chunked_len if self.chunked_len > 0 else self.len
@@ -157,27 +181,28 @@ class Slice_Children_Provider(lldb.SBSyntheticValueProvider):
         length = self.num_children()
         assert idx >= 0 and idx < length
 
-        first = self.data_val.deref
+        pointee = self.data.deref
 
         if self.chunked_len > 0:
-            chunk_size = SLICE_CHUNK_COUNT
+            array_len   = min(SLICE_CHUNK_COUNT, self.len - idx * SLICE_CHUNK_COUNT)
+            range_start = idx * SLICE_CHUNK_COUNT
+            name        = f"[{range_start}..<{range_start+array_len}]"
+            offset      = idx * pointee.size * SLICE_CHUNK_COUNT
+            type        = pointee.type.GetArrayType(array_len)
+        else:
+            name        = f"[{idx}]"
+            offset      = idx * pointee.size
+            type        = pointee.type
 
-            array_len = min(chunk_size, self.len - idx * chunk_size)
-            arr_type  = first.type.GetArrayType(array_len)
-            offset    = idx * first.size * chunk_size
-
-            range_start = idx * chunk_size
-
-            return self.data_val.CreateChildAtOffset(f"[{range_start}..<{range_start+array_len}]", offset, arr_type)
-
-        offset = idx * first.size
-        return self.data_val.CreateChildAtOffset(f"[{idx}]", offset, first.type)
+        return self.data.CreateChildAtOffset(name, offset, type)
 
 
 # ------------------------------------------------------------------------------
 # Array Values
 
 def array_summary(v: lldb.SBValue, _dict) -> str:
+    v = v.GetNonSyntheticValue() if v.IsSynthetic() else v
+
     length = v.num_children
 
     return aggregate_value_summary(f"[{length}]{{", "}",
@@ -191,7 +216,7 @@ def array_summary(v: lldb.SBValue, _dict) -> str:
 
 def string_summary(value: lldb.SBValue, _dict) -> str | None:
     pointer = value.GetChildMemberWithName("data").GetValueAsUnsigned(0)
-    length = value.GetChildMemberWithName("len").GetValueAsSigned(0)
+    length  = value.GetChildMemberWithName("len").GetValueAsSigned(0)
     if pointer == 0:
         return None
     if length == 0:
@@ -245,7 +270,7 @@ class MapChildProvider:
 
         key_index = 0
         for i in range(cap):
-            TOMBSTONE_MASK = 1 << (size_of_hash*8 - 1)
+            tombstone_mask = 1 << (size_of_hash*8 - 1)
 
             offset_hash = hash_ptr + i * size_of_hash
 
@@ -253,7 +278,7 @@ class MapChildProvider:
             if not error.success:
                 print(error)
                 continue
-            elif hash_val == 0 or (hash_val & TOMBSTONE_MASK) != 0:
+            elif hash_val == 0 or (hash_val & tombstone_mask) != 0:
                 continue
 
             offset_key   = self.cell_index(key_ptr, key_cell_info, i)
