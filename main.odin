@@ -1,18 +1,36 @@
 #+feature dynamic-literals
 package main
 
+import "base:runtime"
 import "core:fmt"
 import "core:io"
 
 Enum :: enum {One, Two, Three}
+
 Foo :: struct {foo_name: string, value: int}
 Bar :: struct {value: int, bar_name: string}
 
-Foo_Bar_Union :: union {Foo, Bar, string}
-Foo_Bar_Union_No_Nill :: union #no_nil {Foo, Bar}
+Foo_Bar_Union            :: union {Foo, Bar, string}
+Foo_Bar_Union_No_Nill    :: union #no_nil {Foo, Bar}
 Foo_Bar_Union_Shared_Nil :: union #shared_nil {Enum, ^Foo, ^Bar}
 
 main :: proc () {
+
+	str_empty := ""
+	// (lldb) p str_empty
+	// (string) ""
+
+	str_nil: string
+	// (lldb) p str_nil
+	// (string) ""
+
+	str_raw: runtime.Raw_String = {len = 10}
+	// (lldb) p str_raw
+	// (runtime::Raw_String) {nil, 10}
+
+	str_nil_with_len := transmute(string)str_raw
+	// (lldb) p str_nil_with_len
+	// (string) {nil, 10}
 
 	foo := Foo{"Hello", 42}
 	// (lldb) p foo

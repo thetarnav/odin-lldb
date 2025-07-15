@@ -7,6 +7,7 @@ and laytan's script: https://gist.github.com/laytan/a94c323a84cef7bcfbdf6d21987f
 Repository: https://github.com/thetarnav/odin-lldb
 """
 
+from webbrowser import get
 import lldb
 import math
 import enum
@@ -126,13 +127,13 @@ def aggregate_value_summary(
 # since the layout is the same:
 # 
 #    Raw_Slice :: struct($T: typeid) {
+#        data: [^]T,
 #        len:  int,
-#        data: ^T,
 #    }
 # 
 #    Raw_Dynamic_Array :: struct($T: typeid) {
+#        data:      [^]T,
 #        len:       int,
-#        data:      ^T,
 #        cap:       int,
 #        allocator: ^runtime.Allocator,
 #    }
@@ -213,20 +214,36 @@ def array_summary(v: lldb.SBValue, _dict) -> str:
 
 # ------------------------------------------------------------------------------
 # String Values
+# 
+# Same layout as a slice,
+#    Raw_String :: struct {
+#        data: [^]u8,
+#        len:  int,
+#    }
+# 
+# Odin strings are UTF-8 encoded
 
-def string_summary(value: lldb.SBValue, _dict) -> str | None:
-    pointer = value.GetChildMemberWithName("data").GetValueAsUnsigned(0)
-    length  = value.GetChildMemberWithName("len").GetValueAsSigned(0)
-    if pointer == 0:
-        return None
+def string_summary(v: lldb.SBValue, _dict) -> str:
+
+    length  = get_len(v)
     if length == 0:
         return '""'
+
+    pointer = get_data(v).GetValueAsUnsigned(0)
+    if pointer == 0:
+        return struct_summary(v, _dict)
+
     error = lldb.SBError()
-    string_data = value.process.ReadMemory(pointer, length, error)
+    string_data = v.process.ReadMemory(pointer, length, error)
     if not error.success:
         print(f"Error reading string data: {error}")
-        return None
+        return "<error reading string>"
+
     return '"{}"'.format(string_data.decode("utf-8"))
+
+
+# ------------------------------------------------------------------------------
+# Map Values
 
 class MapChildProvider:
 
