@@ -121,6 +121,20 @@ def aggregate_value_summary(
 
 
 # ------------------------------------------------------------------------------
+# Struct Values
+#
+# Default for any struct type that is not a built-in type.
+
+def struct_summary(v: lldb.SBValue, _dict) -> str:
+    v = v.GetNonSyntheticValue()
+
+    return aggregate_value_summary("{", "}",
+        get_value=lambda i: v.GetChildAtIndex(i),
+        length=v.num_children,
+    )
+
+
+# ------------------------------------------------------------------------------
 # Slice Values
 # 
 # handles both slices and dynamic arrays
@@ -426,22 +440,6 @@ class Union_Children_Provider(lldb.SBSyntheticValueProvider):
         return self.variant.GetIndexOfChildWithName(name) if self.variant else None
 
 
-def struct_summary(v: lldb.SBValue, _dict) -> str:
-    if v.IsSynthetic():
-        v = v.GetNonSyntheticValue()
-    
-    output = "{"
-
-    for i, field in enumerate(v.children):
-
-        # Let LLDB handle the formatting using registered formatters
-        output += value_summary(field)
-
-        if i < len(v.children) - 1:
-            output += ", "
-
-    output += "}"
-    return output
 
 def correct_proc_type_display(t: lldb.SBType) -> str:
 

@@ -10,11 +10,22 @@ Enum :: enum {One, Two, Three}
 Foo :: struct {foo_name: string, value: int}
 Bar :: struct {value: int, bar_name: string}
 
+Struct_Empty :: struct {}
+Struct_Long  :: struct {a: int, b: int, c: int, d: int, e: int, f: int}
+
 Foo_Bar_Union            :: union {Foo, Bar, string}
 Foo_Bar_Union_No_Nill    :: union #no_nil {Foo, Bar}
 Foo_Bar_Union_Shared_Nil :: union #shared_nil {Enum, ^Foo, ^Bar}
 
 main :: proc () {
+
+	struct_empty := Struct_Empty{}
+	// (lldb) p struct_empty
+	// (main::Struct_Empty) {}
+
+	struct_long := Struct_Long{1000001, 1000002, 1000003, 1000004, 1000005, 1000006}
+	// (lldb) p struct_long
+	// (main::Struct_Long) {1000001, 1000002, 1000003, 1000004, 1000005...}
 
 	str_empty := ""
 	// (lldb) p str_empty
