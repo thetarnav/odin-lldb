@@ -11,7 +11,7 @@ Foo :: struct {foo_name: string, value: int}
 Bar :: struct {value: int, bar_name: string}
 
 Struct_Empty :: struct {}
-Struct_Long  :: struct {a: int, b: int, c: int, d: int, e: int, f: int}
+Struct_Long  :: struct {a, b, c, d, e, f: int}
 
 Foo_Bar_Union            :: union {Foo, Bar, string}
 Foo_Bar_Union_No_Nill    :: union #no_nil {Foo, Bar}
