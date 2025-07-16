@@ -273,49 +273,53 @@ def map_summary(v: lldb.SBValue, _dict) -> str:
 
 class Map_Children_Provider:
 
-    def __init__(self, val, dict):
+    def __init__(self, val, dict) -> None:
         self.val = val
+
+    def update(self) -> None:
+        data = get_data(self.val)
+
+        hash_field = value_get_child(data, "hash")
+        key_cell   = value_get_child(data, "key_cell")
+        value_cell = value_get_child(data, "value_cell")
+
+        self.key_type = value_get_child(data, "key").type
+        self.val_type = value_get_child(data, "value").type
+
+        self.key_ptr = data.unsigned & ~63
+        cap_log2     = data.unsigned & 63
+        self.cap     = 1 << cap_log2 if cap_log2 > 0 else 0
+
+        assert hash_field.size == 8 # Odin uses 64-bit hashes
+
+        self.key_cell_info = cell_info(self.key_type, key_cell)
+        self.val_cell_info = cell_info(self.val_type, value_cell)
+
+        self.val_ptr  = cell_index(self.key_ptr, self.key_cell_info, self.cap)
+        self.hash_ptr = cell_index(self.val_ptr, self.val_cell_info, self.cap)
 
     def num_children(self):
         return get_len(self.val) * 2 + 1
 
     def get_child_at_index(self, index):
-        data       = get_data(self.val)
-        tkey       = value_get_child(data, "key").type
-        tval       = value_get_child(data, "value").type
-        hash_field = value_get_child(data, "hash")
-        key_cell   = value_get_child(data, "key_cell")
-        value_cell = value_get_child(data, "value_cell")
-
-        raw_data   = data.GetValueAsUnsigned()
-        key_ptr    = raw_data & ~63
-        cap_log2   = raw_data & 63
-        cap        = 0 if cap_log2 <= 0 else 1 << cap_log2
-
-        key_cell_info   = cell_info(tkey, key_cell)
-        value_cell_info = cell_info(tval, value_cell)
-
-        size_of_hash = hash_field.size
-        assert size_of_hash == 8
-    
-        value_ptr = cell_index(key_ptr, key_cell_info, cap)
-        hash_ptr  = cell_index(value_ptr, value_cell_info, cap)
 
         error = lldb.SBError()
 
         # Last one, the capacity.
         if index == self.num_children()-1:
-            cap_data = lldb.SBData.CreateDataFromInt(cap)
-            return self.val.CreateValueFromData("cap", cap_data, self.val.GetChildMemberWithName("len").type)
+            cap_data = lldb.SBData.CreateDataFromInt(self.cap)
+            int_type = value_get_child(self.val, "len").type
+            return self.val.CreateValueFromData("cap", cap_data, int_type)
 
         wants_key = index % 2 == 0
         index = int(index / 2)
 
         key_index = 0
-        for i in range(cap):
+        for i in range(self.cap):
+            size_of_hash = 8  # Odin uses 64-bit hashes
             tombstone_mask = 1 << (size_of_hash*8 - 1)
 
-            offset_hash = hash_ptr + i * size_of_hash
+            offset_hash = self.hash_ptr + i * size_of_hash
 
             hash_val = self.val.process.ReadUnsignedFromMemory(offset_hash, size_of_hash, error)
             if not error.success:
@@ -324,20 +328,20 @@ class Map_Children_Provider:
             elif hash_val == 0 or (hash_val & tombstone_mask) != 0:
                 continue
 
-            offset_key   = cell_index(key_ptr, key_cell_info, i)
-            offset_value = cell_index(value_ptr, value_cell_info, i)
+            offset_key   = cell_index(self.key_ptr, self.key_cell_info, i)
+            offset_value = cell_index(self.val_ptr, self.val_cell_info, i)
 
             if index == key_index:
                 if wants_key:
-                    return self.val.CreateValueFromAddress(f"[{i}]", offset_key, tkey)
+                    return self.val.CreateValueFromAddress(f"[{i}]", offset_key, self.key_type)
                 else:
-                    return self.val.CreateValueFromAddress(f"[{i}]", offset_value, tval)
+                    return self.val.CreateValueFromAddress(f"[{i}]", offset_value, self.val_type)
 
             key_index += 1
 
         print("not found")
 
-def cell_info(typev, cell_type) -> 'Cell_Info':
+def cell_info(typev: lldb.SBType, cell_type: lldb.SBValue) -> 'Cell_Info':
     elements_per_cell = 0
 
     if typev.size != cell_type.size:
