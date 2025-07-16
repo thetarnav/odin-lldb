@@ -178,11 +178,9 @@ main :: proc () {
 
 	str_map: map[string]Foo = {
 		"key1" = {"Value1", 1},
-		"key2" = {"Value2", 2},
-		"key3" = {"Value3", 3},
 	}
 	// (lldb) p str_map
-	// (map[string]main::Foo) map[3]{"key3" = {"Value3", 3}, "key1" = {"Value1", 1}...}
+	// (map[string]main::Foo) map[1]{"key1" = {"Value1", 1}}
 
 	breakpoint() // for lldb to breakpoint here
 	return
