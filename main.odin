@@ -23,9 +23,9 @@ main :: proc () {
 	// (lldb) p struct_empty
 	// (main::Struct_Empty) {}
 
-	struct_long := Struct_Long{1000001, 1000002, 1000003, 1000004, 1000005, 1000006}
+	struct_long := Struct_Long{100000001, 100000002, 100000003, 100000004, 100000005, 100000006}
 	// (lldb) p struct_long
-	// (main::Struct_Long) {1000001, 1000002, 1000003, 1000004, 1000005...}
+	// (main::Struct_Long) {100000001, 100000002, 100000003, 100000004, 100000005...}
 
 	str_empty := ""
 	// (lldb) p str_empty
@@ -158,7 +158,7 @@ main :: proc () {
 
 	dynamic_array_long := [dynamic]Foo{Foo{"Dynamic1", 1}, Foo{"Dynamic2", 2}, Foo{"Dynamic3", 3}, Foo{"Dynamic4", 4}, Foo{"Dynamic5", 5}}
 	// (lldb) p dynamic_array_long
-	// ([dynamic]main::Foo) [5]{{"Dynamic1", 1}, {"Dynamic2", 2}...}
+	// ([dynamic]main::Foo) [5]{{"Dynamic1", 1}, {"Dynamic2", 2}, {"Dynamic3", 3}...}
 
 	dynamic_array_chunked: [dynamic]Foo
 	for i in 0..<10_000 {
@@ -166,14 +166,14 @@ main :: proc () {
 	}
 
 	// (lldb) p dynamic_array_chunked
-	// ([dynamic]main::Foo) [10000]{{"DynamicChunked", 0}...}
+	// ([dynamic]main::Foo) [10000]{{"DynamicChunked", 0}, {"DynamicChunked", 1}...}
 
 	// (lldb) frame variable dynamic_array_chunked[0] dynamic_array_chunked[0][0]
-	// (main::Foo[1000]) dynamic_array_chunked[0] = [1000]{{"DynamicChunked", 0}...}
+	// (main::Foo[1000]) dynamic_array_chunked[0] = [1000]{{"DynamicChunked", 0}, {"DynamicChunked", 1}...}
 	// (main::Foo) dynamic_array_chunked[0][0] = {"DynamicChunked", 0}
 
 	// (lldb) frame variable dynamic_array_chunked[1] dynamic_array_chunked[1][0]
-	// (main::Foo[1000]) dynamic_array_chunked[1] = [1000]{{"DynamicChunked", 1000}...}
+	// (main::Foo[1000]) dynamic_array_chunked[1] = [1000]{{"DynamicChunked", 1000}, {"DynamicChunked", 1001}...}
 	// (main::Foo) dynamic_array_chunked[1][0] = {"DynamicChunked", 1000}
 
 	str_map: map[string]Foo = {
@@ -182,7 +182,7 @@ main :: proc () {
 		"key3" = {"Value3", 3},
 	}
 	// (lldb) p str_map
-	// (map[string]main::Foo) map[3]{"key3" = {"Value3", 3}...}
+	// (map[string]main::Foo) map[3]{"key3" = {"Value3", 3}, "key1" = {"Value1", 1}...}
 
 	breakpoint() // for lldb to breakpoint here
 	return

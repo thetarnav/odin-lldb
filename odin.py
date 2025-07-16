@@ -94,7 +94,7 @@ def value_summary(value: lldb.SBValue) -> str:
         return "<invalid value>"
     return value.GetSummary() or value.GetValue() or "<no value>"
 
-AGGREGATE_SUMMARY_MAX_LEN = 50
+AGGREGATE_SUMMARY_MAX_LEN = 60
 SLICE_CHUNK_SIZE          = 1000
 
 def aggregate_value_summary(
