@@ -78,7 +78,7 @@ main :: proc () {
 	// (lldb) p foo_bar_union_no_nil
 	// (main::Foo_Bar_Union_No_Nill) main.Foo({"Hello", 42})
 
-	// (lldb) frame variable foo_bar_union_no_nil[0] foo_bar_union_no_nil[1]
+	// (lldb) frame v foo_bar_union_no_nil[0] foo_bar_union_no_nil[1]
 	// (string) foo_bar_union_no_nil[0] = "Hello"
 	// (int) foo_bar_union_no_nil[1] = 42
 
@@ -86,7 +86,7 @@ main :: proc () {
 	// (lldb) p foo_bar_union_shared_nil
 	// (main::Foo_Bar_Union_Shared_Nil) ^main.Bar(&{84, "World"})
 
-	// (lldb) frame variable foo_bar_union_shared_nil[0] foo_bar_union_shared_nil[1]
+	// (lldb) frame v foo_bar_union_shared_nil[0] foo_bar_union_shared_nil[1]
 	// (int) foo_bar_union_shared_nil[0] = 84
 	// (string) foo_bar_union_shared_nil[1] = "World"
 
@@ -120,7 +120,7 @@ main :: proc () {
 	// (lldb) p slice
 	// ([]main::Foo) [2]{{"Slice1", 1}, {"Slice2", 2}}
 
-	// (lldb) frame variable slice[0] slice[1]
+	// (lldb) frame v slice[0] slice[1]
 	// (main::Foo) slice[0] = {"Slice1", 1}
 	// (main::Foo) slice[1] = {"Slice2", 2}
 
@@ -136,7 +136,7 @@ main :: proc () {
 	// (lldb) p array
 	// (main::Foo[2]) [2]{{"Array1", 1}, {"Array2", 2}}
 
-	// (lldb) frame variable array[0] array[1]
+	// (lldb) frame v array[0] array[1]
 	// (main::Foo) array[0] = {"Array1", 1}
 	// (main::Foo) array[1] = {"Array2", 2}
 
@@ -152,7 +152,7 @@ main :: proc () {
 	// (lldb) p dynamic_array
 	// ([dynamic]main::Foo) [2]{{"Dynamic1", 1}, {"Dynamic2", 2}}
 
-	// (lldb) frame variable dynamic_array[0] dynamic_array[1]
+	// (lldb) frame v dynamic_array[0] dynamic_array[1]
 	// (main::Foo) dynamic_array[0] = {"Dynamic1", 1}
 	// (main::Foo) dynamic_array[1] = {"Dynamic2", 2}
 
@@ -168,11 +168,11 @@ main :: proc () {
 	// (lldb) p dynamic_array_chunked
 	// ([dynamic]main::Foo) [10000]{{"DynamicChunked", 0}, {"DynamicChunked", 1}...}
 
-	// (lldb) frame variable dynamic_array_chunked[0] dynamic_array_chunked[0][0]
+	// (lldb) frame v dynamic_array_chunked[0] dynamic_array_chunked[0][0]
 	// (main::Foo[1000]) dynamic_array_chunked[0] = [1000]{{"DynamicChunked", 0}, {"DynamicChunked", 1}...}
 	// (main::Foo) dynamic_array_chunked[0][0] = {"DynamicChunked", 0}
 
-	// (lldb) frame variable dynamic_array_chunked[1] dynamic_array_chunked[1][0]
+	// (lldb) frame v dynamic_array_chunked[1] dynamic_array_chunked[1][0]
 	// (main::Foo[1000]) dynamic_array_chunked[1] = [1000]{{"DynamicChunked", 1000}, {"DynamicChunked", 1001}...}
 	// (main::Foo) dynamic_array_chunked[1][0] = {"DynamicChunked", 1000}
 
