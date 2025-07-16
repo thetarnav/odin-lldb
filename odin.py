@@ -280,12 +280,12 @@ class Map_Children_Provider:
         return get_len(self.val) * 2 + 1
 
     def get_child_at_index(self, index):
-        data       = self.val.GetChildMemberWithName("data")
-        tkey       = data.GetChildMemberWithName("key").type
-        tval       = data.GetChildMemberWithName("value").type
-        hash_field = data.GetChildMemberWithName("hash")
-        key_cell   = data.GetChildMemberWithName("key_cell")
-        value_cell = data.GetChildMemberWithName("value_cell")
+        data       = get_data(self.val)
+        tkey       = value_get_child(data, "key").type
+        tval       = value_get_child(data, "value").type
+        hash_field = value_get_child(data, "hash")
+        key_cell   = value_get_child(data, "key_cell")
+        value_cell = value_get_child(data, "value_cell")
 
         raw_data   = data.GetValueAsUnsigned()
         key_ptr    = raw_data & ~63
