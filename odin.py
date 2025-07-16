@@ -15,6 +15,7 @@ from collections.abc import Callable
 
 
 def __lldb_init_module(debugger: lldb.SBDebugger, unused) -> None:
+    debugger.HandleCommand("type summary add --python-function odin.struct_summary             --recognizer-function odin.is_type_struct")
     debugger.HandleCommand("type summary add --python-function odin.pointer_summary --no-value --recognizer-function odin.is_type_pointer")
     debugger.HandleCommand("type summary add --python-function odin.union_summary              --recognizer-function odin.is_type_union")
     debugger.HandleCommand("type synth   add --python-class    odin.Union_Children_Provider    --recognizer-function odin.is_type_union")
@@ -22,8 +23,8 @@ def __lldb_init_module(debugger: lldb.SBDebugger, unused) -> None:
     debugger.HandleCommand("type synth   add --python-class    odin.Slice_Children_Provider    --recognizer-function odin.is_type_slice")
     debugger.HandleCommand("type summary add --python-function odin.slice_summary              --recognizer-function odin.is_type_slice")
     debugger.HandleCommand("type summary add --python-function odin.array_summary              --recognizer-function odin.is_type_array")
-    debugger.HandleCommand("type synth   add --python-class    odin.MapChildProvider           --recognizer-function odin.is_type_map")
-    debugger.HandleCommand("type summary add --python-function odin.struct_summary             --recognizer-function odin.is_type_struct")
+    debugger.HandleCommand("type synth   add --python-class    odin.Map_Children_Provider      --recognizer-function odin.is_type_map")
+    debugger.HandleCommand("type summary add --python-function odin.map_summary                --recognizer-function odin.is_type_map")
 
 
 class Odin_Type(enum.Enum):
@@ -99,23 +100,22 @@ SLICE_CHUNK_SIZE          = 1000
 def aggregate_value_summary(
     prefix:    str,
     suffix:    str,
-    get_value: Callable[[int], lldb.SBValue],
+    get_value: Callable[[int], str],
     length:    int,
 ) -> str:
     summary = prefix
     
     for i in range(length):
         item = get_value(i)
-        item_summary = value_summary(item)
         
         separator = ", " if i > 0 else ""
-        new_length = len(summary) + len(separator) + len(item_summary) + len(suffix)
+        new_length = len(summary) + len(separator) + len(item) + len(suffix)
 
         if new_length > AGGREGATE_SUMMARY_MAX_LEN and i > 0:
             summary += "..."
             break
 
-        summary += separator + item_summary
+        summary += separator + item
 
     return summary + suffix
 
@@ -129,7 +129,7 @@ def struct_summary(v: lldb.SBValue, _dict) -> str:
     v = v.GetNonSyntheticValue()
 
     return aggregate_value_summary("{", "}",
-        get_value=lambda i: v.GetChildAtIndex(i),
+        get_value=lambda i: value_summary(v.GetChildAtIndex(i)),
         length=v.num_children,
     )
 
@@ -167,10 +167,10 @@ def slice_summary(v: lldb.SBValue, _dict) -> str:
 
     # GetChildAtIndex goes through Slice_Children_Provider
     if length > SLICE_CHUNK_SIZE:
-        get_value = lambda i: v.GetChildAtIndex(i // SLICE_CHUNK_SIZE) \
-                               .GetChildAtIndex(i % SLICE_CHUNK_SIZE)
+        get_value = lambda i: value_summary(v.GetChildAtIndex(i // SLICE_CHUNK_SIZE) \
+                                             .GetChildAtIndex(i % SLICE_CHUNK_SIZE))
     else:
-        get_value = lambda i: v.GetChildAtIndex(i)
+        get_value = lambda i: value_summary(v.GetChildAtIndex(i))
 
     return aggregate_value_summary(f"[{length}]{{", "}", get_value, length)
 
@@ -221,7 +221,7 @@ def array_summary(v: lldb.SBValue, _dict) -> str:
     length = v.num_children
 
     return aggregate_value_summary(f"[{length}]{{", "}",
-        get_value=lambda i: v.GetChildAtIndex(i),
+        get_value=lambda i: value_summary(v.GetChildAtIndex(i)),
         length=length,
     )
 
@@ -259,13 +259,25 @@ def string_summary(v: lldb.SBValue, _dict) -> str:
 # ------------------------------------------------------------------------------
 # Map Values
 
-class MapChildProvider:
+def map_summary(v: lldb.SBValue, _dict) -> str:
+
+    length = get_len(v.GetNonSyntheticValue())
+    if length == 0:
+        return "map[0]{}"
+
+    return aggregate_value_summary(
+        f"map[{length}]{{", "}",
+        get_value=lambda i: f"{value_summary(v.GetChildAtIndex(i*2))} = {value_summary(v.GetChildAtIndex(i*2 + 1))}",
+        length=length,
+    )
+
+class Map_Children_Provider:
 
     def __init__(self, val, dict):
         self.val = val
 
     def num_children(self):
-        return (self.val.GetChildMemberWithName("len").GetValueAsSigned() * 2) + 1
+        return get_len(self.val) * 2 + 1
 
     def get_child_at_index(self, index):
         data       = self.val.GetChildMemberWithName("data")
@@ -325,7 +337,7 @@ class MapChildProvider:
 
         print("not found")
 
-def cell_info(typev, cell_type) -> 'CellInfo':
+def cell_info(typev, cell_type) -> 'Cell_Info':
     elements_per_cell = 0
 
     if typev.size != cell_type.size:
@@ -336,9 +348,9 @@ def cell_info(typev, cell_type) -> 'CellInfo':
     if elements_per_cell == 0:
         elements_per_cell = 1
 
-    return CellInfo(typev.size, cell_type.size, elements_per_cell)
+    return Cell_Info(typev.size, cell_type.size, elements_per_cell)
 
-def cell_index(base: int, info: "CellInfo", index: int) -> int:
+def cell_index(base: int, info: "Cell_Info", index: int) -> int:
     cell_index = 0
     data_index = 0
     if info.elements_per_cell == 1:
@@ -364,7 +376,7 @@ def cell_index(base: int, info: "CellInfo", index: int) -> int:
 
     return base + (cell_index * info.size_of_cell) + (data_index * info.size_of_type);
 
-class CellInfo:
+class Cell_Info:
     def __init__(self, size_of_type: int, size_of_cell: int, elements_per_cell: int) -> None:
         self.size_of_type      = size_of_type
         self.size_of_cell      = size_of_cell
