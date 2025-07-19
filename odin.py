@@ -7,7 +7,6 @@ and laytan's script: https://gist.github.com/laytan/a94c323a84cef7bcfbdf6d21987f
 Repository: https://github.com/thetarnav/odin-lldb
 """
 
-from webbrowser import get
 import lldb
 import math
 import enum
