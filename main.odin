@@ -176,11 +176,13 @@ main :: proc () {
 	// (main::Foo[1000]) dynamic_array_chunked[1] = [1000]{{"DynamicChunked", 1000}, {"DynamicChunked", 1001}...}
 	// (main::Foo) dynamic_array_chunked[1][0] = {"DynamicChunked", 1000}
 
-	str_map: map[string]Foo = {
-		"key1" = {"Value1", 1},
-	}
+	str_map: map[string]Foo = {"key1" = {"Value1", 1}}
 	// (lldb) p str_map
 	// (map[string]main::Foo) map[1]{"key1" = {"Value1", 1}}
+
+	str_map_empty: map[string]Foo = {}
+	// (lldb) p str_map_empty
+	// (map[string]main::Foo) map[0]{}
 
 	breakpoint() // for lldb to breakpoint here
 	return
