@@ -261,7 +261,7 @@ def string_summary(v: lldb.SBValue, _dict) -> str:
 
 def map_summary(v: lldb.SBValue, _dict) -> str:
 
-    length = get_len(v.GetNonSyntheticValue())
+    length = get_len(v)
     if length == 0:
         return "map[0]{}"
 
@@ -299,16 +299,22 @@ class Map_Children_Provider:
         self.hash_ptr = cell_index(self.val_ptr, self.val_cell_info, self.cap)
 
     def num_children(self):
-        return get_len(self.val) * 2 + 1
+        return get_len(self.val)*2 + 2
 
     def get_child_at_index(self, index):
 
         error = lldb.SBError()
-
-        # Last one, the capacity.
-        if index == self.num_children()-1:
-            cap_data = lldb.SBData.CreateDataFromInt(self.cap)
+        
+        # Second to last one: length
+        if index == self.num_children()-2:
             int_type = value_get_child(self.val, "len").type
+            len_data = lldb.SBData.CreateDataFromInt(get_len(self.val), int_type.GetByteSize())
+            return self.val.CreateValueFromData("len", len_data, int_type)
+
+        # Last one: capacity
+        if index == self.num_children()-1:
+            int_type = value_get_child(self.val, "len").type
+            cap_data = lldb.SBData.CreateDataFromInt(self.cap, int_type.GetByteSize())
             return self.val.CreateValueFromData("cap", cap_data, int_type)
 
         key_index = 0

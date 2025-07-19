@@ -192,7 +192,8 @@ main :: proc () {
 	// [3] [3] = {"Value2", 2}
 	// [4] [4] = "key3"
 	// [5] [5] = {"Value3", 3}
-	// [6] cap = %INT%
+	// [6] len = 3
+	// [7] cap = 8
 
 	breakpoint() // for lldb to breakpoint here
 	return
