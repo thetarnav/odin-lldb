@@ -316,6 +316,9 @@ class Map_Children_Provider:
             int_type = value_get_child(self.val, "len").type
             cap_data = lldb.SBData.CreateDataFromInt(self.cap, int_type.GetByteSize())
             return self.val.CreateValueFromData("cap", cap_data, int_type)
+        
+        entry_idx = index // 2
+        wants_key = index % 2 == 0
 
         key_index = 0
         for i in range(self.cap):
@@ -334,11 +337,12 @@ class Map_Children_Provider:
             offset_key   = cell_index(self.key_ptr, self.key_cell_info, i)
             offset_value = cell_index(self.val_ptr, self.val_cell_info, i)
 
-            if index // 2 == key_index:
-                if index % 2 == 0:
-                    return self.val.CreateValueFromAddress(f"[{index}]", offset_key, self.key_type)
-                else:
-                    return self.val.CreateValueFromAddress(f"[{index}]", offset_value, self.val_type)
+            if entry_idx == key_index:
+                key_val = self.val.CreateValueFromAddress(f"key{entry_idx}", offset_key, self.key_type)
+                if wants_key:
+                    return key_val
+
+                return self.val.CreateValueFromAddress(f"[{value_summary(key_val)}]", offset_value, self.val_type)
 
             key_index += 1
 

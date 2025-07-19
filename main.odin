@@ -186,12 +186,12 @@ main :: proc () {
 
 	str_map_children: map[string]Foo = {"key1" = {"Value1", 1}, "key2" = {"Value2", 2}, "key3" = {"Value3", 3}}
 	// (lldb) print_children str_map_children
-	// [0] [0] = "key1"
-	// [1] [1] = {"Value1", 1}
-	// [2] [2] = "key2"
-	// [3] [3] = {"Value2", 2}
-	// [4] [4] = "key3"
-	// [5] [5] = {"Value3", 3}
+	// [0] key0 = "key1"
+	// [1] ["key1"] = {"Value1", 1}
+	// [2] key1 = "key2"
+	// [3] ["key2"] = {"Value2", 2}
+	// [4] key2 = "key3"
+	// [5] ["key3"] = {"Value3", 3}
 	// [6] len = 3
 	// [7] cap = 8
 
