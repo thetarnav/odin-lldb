@@ -186,14 +186,14 @@ main :: proc () {
 
 	str_map_children: map[string]Foo = {"key1" = {"Value1", 1}, "key2" = {"Value2", 2}, "key3" = {"Value3", 3}}
 	// (lldb) print_children str_map_children
-	// [0] key0 = "key1"
-	// [1] ["key1"] = {"Value1", 1}
-	// [2] key1 = "key2"
-	// [3] ["key2"] = {"Value2", 2}
-	// [4] key2 = "key3"
-	// [5] ["key3"] = {"Value3", 3}
-	// [6] len = 3
-	// [7] cap = 8
+	// key0 = "key1"
+	// ["key1"] = {"Value1", 1}
+	// key1 = "key2"
+	// ["key2"] = {"Value2", 2}
+	// key2 = "key3"
+	// ["key3"] = {"Value3", 3}
+	// len = 3
+	// cap = 8
 
 	breakpoint() // for lldb to breakpoint here
 	return

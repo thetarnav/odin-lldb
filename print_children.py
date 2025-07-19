@@ -24,10 +24,10 @@ def print_children(
         result.AppendMessage("  No children")
         return
 
-    for i, child in enumerate(variable.children):
+    for child in variable.children:
         name  = child.GetName()
         value = child.GetSummary() or child.GetValue()
-        result.AppendMessage(f"[{i}] {name} = {value}")
+        result.AppendMessage(f"{name} = {value}")
 
 def __lldb_init_module(debugger, internal_dict):
     debugger.HandleCommand('command script add -f print_children.print_children print_children')
