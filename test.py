@@ -112,22 +112,42 @@ def parse_test_cases(filename: str) -> List[TestCase]:
     print(success(f"Found {len(test_cases)} test cases"))
     return test_cases
 
-
-def normalize_pointer_values(text: str) -> str:
-    """Replace actual pointer values with %PTR% for comparison."""
-    # Match hexadecimal pointer values (0x followed by hex digits)
-    return re.sub(r'0x[0-9a-fA-F]+', '%PTR%', text)
-
-
 def compare_outputs(expected: str, actual: str) -> bool:
-    expected_norm = normalize_pointer_values(expected.strip())
-    actual_norm   = normalize_pointer_values(actual.strip())
-    
-    return expected_norm == actual_norm
+
+    ei, ai = 0, 0
+
+    while ei < len(expected) and ai < len(actual):
+        # expect any int
+        if expected[ei:ei+5] == "%INT%":
+            ei += 5
+            while ai < len(actual) and actual[ai].isdigit(): ai += 1
+        # expect any ptr (0x123123d123)
+        elif expected[ei:ei+5] == "%PTR%":
+            ei += 5
+            if actual[ai]   != '0': return False
+            if actual[ai+1] != 'x': return False
+            ai += 2
+            while ai < len(actual) and (actual[ai].isdigit() or actual[ai] in 'abcdef'): ai += 1
+        # compare chars
+        elif expected[ei] != actual[ai]:
+            return False
+        ei += 1
+        ai += 1
+
+    if ei < len(expected) or ai < len(actual):
+        return False
+
+    return True
 
 def run_lldb(test_cases: List[TestCase]) -> str:
 
-    cmd = ["lldb", "main.bin", "--no-lldbinit", "-o", "command script import odin.py", "-o", "b breakpoint", "-o", "r", "-o", "up"]
+    cmd = ["lldb", "main.bin",
+           "--no-lldbinit",
+           "-o", "command script import odin.py",
+           "-o", "command script import print_children.py",
+           "-o", "b breakpoint",
+           "-o", "r",
+           "-o", "up"]
 
     for test_case in test_cases:
         cmd.append("-o")

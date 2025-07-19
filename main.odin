@@ -184,6 +184,16 @@ main :: proc () {
 	// (lldb) p str_map_empty
 	// (map[string]main::Foo) map[0]{}
 
+	str_map_children: map[string]Foo = {"key1" = {"Value1", 1}, "key2" = {"Value2", 2}, "key3" = {"Value3", 3}}
+	// (lldb) print_children str_map_children
+	// [0] [0] = "key1"
+	// [1] [0] = {"Value1", 1}
+	// [2] [1] = "key2"
+	// [3] [1] = {"Value2", 2}
+	// [4] [6] = "key3"
+	// [5] [6] = {"Value3", 3}
+	// [6] cap = %INT%
+
 	breakpoint() // for lldb to breakpoint here
 	return
 }
