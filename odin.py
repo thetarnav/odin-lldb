@@ -311,9 +311,6 @@ class Map_Children_Provider:
             int_type = value_get_child(self.val, "len").type
             return self.val.CreateValueFromData("cap", cap_data, int_type)
 
-        wants_key = index % 2 == 0
-        index = int(index / 2)
-
         key_index = 0
         for i in range(self.cap):
             size_of_hash = 8  # Odin uses 64-bit hashes
@@ -331,11 +328,11 @@ class Map_Children_Provider:
             offset_key   = cell_index(self.key_ptr, self.key_cell_info, i)
             offset_value = cell_index(self.val_ptr, self.val_cell_info, i)
 
-            if index == key_index:
-                if wants_key:
-                    return self.val.CreateValueFromAddress(f"[{i}]", offset_key, self.key_type)
+            if index // 2 == key_index:
+                if index % 2 == 0:
+                    return self.val.CreateValueFromAddress(f"[{index}]", offset_key, self.key_type)
                 else:
-                    return self.val.CreateValueFromAddress(f"[{i}]", offset_value, self.val_type)
+                    return self.val.CreateValueFromAddress(f"[{index}]", offset_value, self.val_type)
 
             key_index += 1
 
