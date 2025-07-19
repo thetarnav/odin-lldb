@@ -5,7 +5,8 @@ import "base:runtime"
 import "core:fmt"
 import "core:io"
 
-Enum :: enum {One, Two, Three}
+Enum     :: enum u8 {One, Two, Three}
+Enum_Int :: enum int {One, Two, Three}
 
 Foo :: struct {foo_name: string, value: int}
 Bar :: struct {value: int, bar_name: string}
@@ -62,9 +63,29 @@ main :: proc () {
 	// (lldb) p bar
 	// (main::Bar) {84, "World"}
 
-	enum_value := Enum.Three
-	// (lldb) p enum_value
-	// (main::Enum) Three
+	enum_two := Enum.Two
+	// (lldb) p enum_two
+	// (main::Enum) .Two
+
+	enum_three := Enum.Three
+	// (lldb) p enum_three
+	// (main::Enum) .Three
+
+	enum_out_of_bounds := Enum(100)
+	// (lldb) p enum_out_of_bounds
+	// (main::Enum) 100
+
+	enum_int_two := Enum_Int.Two
+	// (lldb) p enum_int_two
+	// (main::Enum_Int) .Two
+
+	enum_int_three := Enum_Int.Three
+	// (lldb) p enum_int_three
+	// (main::Enum_Int) .Three
+
+	enum_int_out_of_bounds := Enum_Int(-100)
+	// (lldb) p enum_int_out_of_bounds
+	// (main::Enum_Int) -100
 
 	foo_bar_union: Foo_Bar_Union = "hello world"
 	// (lldb) p foo_bar_union

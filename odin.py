@@ -25,6 +25,7 @@ def __lldb_init_module(debugger: lldb.SBDebugger, unused) -> None:
     debugger.HandleCommand("type summary add --python-function odin.array_summary              --recognizer-function odin.is_type_array")
     debugger.HandleCommand("type synth   add --python-class    odin.Map_Children_Provider      --recognizer-function odin.is_type_map")
     debugger.HandleCommand("type summary add --python-function odin.map_summary                --recognizer-function odin.is_type_map")
+    debugger.HandleCommand("type summary add --python-function odin.enum_summary    --no-value --recognizer-function odin.is_type_enum")
 
 
 class Odin_Type(enum.Enum):
@@ -34,6 +35,7 @@ class Odin_Type(enum.Enum):
     MAP     = "map"
     STRUCT  = "struct"
     PTR     = "pointer"
+    ENUM    = "enum"
     OTHER   = "other"
 
 def get_odin_type(t: lldb.SBType) -> Odin_Type:
@@ -56,6 +58,9 @@ def get_odin_type(t: lldb.SBType) -> Odin_Type:
     if t.type == lldb.eTypeClassArray:
         return Odin_Type.ARRAY
 
+    if t.type == lldb.eTypeClassEnumeration:
+        return Odin_Type.ENUM
+
     if t.is_pointer:
         return Odin_Type.PTR
     
@@ -67,6 +72,7 @@ def is_type_map    (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == O
 def is_type_struct (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.STRUCT
 def is_type_pointer(t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.PTR
 def is_type_array  (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.ARRAY
+def is_type_enum   (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.ENUM
 
 def type_get_field_at(t: lldb.SBType, idx: int) -> lldb.SBTypeMember:
     return t.GetFieldAtIndex(idx)
@@ -132,6 +138,22 @@ def struct_summary(v: lldb.SBValue, _dict) -> str:
         get_value=lambda i: value_summary(v.GetChildAtIndex(i)),
         length=v.num_children,
     )
+
+
+# ------------------------------------------------------------------------------
+# Enum Values
+
+def enum_summary(v: lldb.SBValue, _dict) -> str:
+
+    num = v.GetValueAsSigned()
+    members = v.type.GetEnumMembers()
+
+    if members.IsValid() and 0 <= num < len(members):
+        member = members[num]
+        if member and member.IsValid() and member.name:
+            return f".{member.name}"
+    
+    return str(num)
 
 
 # ------------------------------------------------------------------------------
