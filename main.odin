@@ -111,6 +111,10 @@ main :: proc () {
 	// (int) foo_bar_union_shared_nil[0] = 84
 	// (string) foo_bar_union_shared_nil[1] = "World"
 
+	foo_bar_union_shared_nil_nil: Foo_Bar_Union_Shared_Nil
+	// (lldb) p foo_bar_union_shared_nil_nil
+	// (main::Foo_Bar_Union_Shared_Nil) nil
+
 	writer := io.Writer{}
 	// (lldb) p writer
 	// (io::Stream) {nil, nil}
