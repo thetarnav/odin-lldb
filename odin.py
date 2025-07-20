@@ -25,6 +25,7 @@ def __lldb_init_module(debugger: lldb.SBDebugger, unused) -> None:
     debugger.HandleCommand("type synth   add --python-class    odin.Map_Children_Provider      --recognizer-function odin.is_type_map")
     debugger.HandleCommand("type summary add --python-function odin.map_summary                --recognizer-function odin.is_type_map")
     debugger.HandleCommand("type summary add --python-function odin.enum_summary    --no-value --recognizer-function odin.is_type_enum")
+    debugger.HandleCommand("type summary add --python-function odin.bitset_summary  --no-value --recognizer-function odin.is_type_bitset")
 
 
 class Odin_Type(enum.Enum):
@@ -35,6 +36,7 @@ class Odin_Type(enum.Enum):
     STRUCT  = "struct"
     PTR     = "pointer"
     ENUM    = "enum"
+    BITSET  = "bitset"
     OTHER   = "other"
 
 def get_odin_type(t: lldb.SBType) -> Odin_Type:
@@ -60,6 +62,12 @@ def get_odin_type(t: lldb.SBType) -> Odin_Type:
     if t.type == lldb.eTypeClassEnumeration:
         return Odin_Type.ENUM
 
+    if t.type == lldb.eTypeClassUnion:
+        if t.name.startswith("bit_set["):
+            return Odin_Type.BITSET
+        # Regular union types are handled elsewhere, not in get_odin_type
+        return Odin_Type.OTHER
+
     if t.is_pointer:
         return Odin_Type.PTR
     
@@ -72,6 +80,7 @@ def is_type_struct (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == O
 def is_type_pointer(t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.PTR
 def is_type_array  (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.ARRAY
 def is_type_enum   (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.ENUM
+def is_type_bitset (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.BITSET
 
 def type_get_field_at(t: lldb.SBType, idx: int) -> lldb.SBTypeMember:
     return t.GetFieldAtIndex(idx)
@@ -153,6 +162,23 @@ def enum_summary(v: lldb.SBValue, _dict) -> str:
             return f".{member.name}"
     
     return str(num)
+
+
+# ------------------------------------------------------------------------------
+# Bit Set Values
+
+def bitset_summary(v: lldb.SBValue, _dict) -> str:
+    v = v.GetNonSyntheticValue()
+
+    set_flags = []
+
+    for field in v.children:
+        if field.IsValid():
+            field_value = v.GetChildMemberWithName(field.name)
+            if field_value.IsValid() and field_value.GetValueAsUnsigned() != 0:
+                set_flags.append(f".{field.name}")
+    
+    return "{" + ", ".join(set_flags) + "}"
 
 
 # ------------------------------------------------------------------------------

@@ -220,6 +220,18 @@ main :: proc () {
 	// len = 3
 	// cap = 8
 
+	flags: bit_set[Enum] = {.One, .Two}
+	// (lldb) p flags
+	// (bit_set[main::Enum]) {.One, .Two}
+
+	flags_empty: bit_set[Enum] = {}
+	// (lldb) p flags_empty
+	// (bit_set[main::Enum]) {}
+
+	flags_max := transmute(bit_set[Enum])max(u8)
+	// (lldb) p flags_max
+	// (bit_set[main::Enum]) {.One, .Two, .Three}
+
 	breakpoint() // for lldb to breakpoint here
 	return
 }
