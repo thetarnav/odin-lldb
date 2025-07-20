@@ -29,64 +29,64 @@ def __lldb_init_module(debugger: lldb.SBDebugger, unused) -> None:
 
 
 class Odin_Type(enum.Enum):
-    SLICE   = "slice"
-    ARRAY   = "array"
-    STRING  = "string" 
-    MAP     = "map"
-    STRUCT  = "struct"
-    PTR     = "pointer"
-    ENUM    = "enum"
-    BITSET  = "bitset"
-    OTHER   = "other"
-    UNION   = "union"
+    Slice  = "slice"
+    Array  = "array"
+    String = "string" 
+    Map    = "map"
+    Struct = "struct"
+    Ptr    = "pointer"
+    Enum   = "enum"
+    Bitset = "bitset"
+    Other  = "other"
+    Union  = "union"
 
 def get_odin_type(t: lldb.SBType) -> Odin_Type:
     
     if t.type == lldb.eTypeClassStruct:
         if t.name == "string":
-            return Odin_Type.STRING
+            return Odin_Type.String
         
         if (
             (t.name.startswith("[]") or t.name.startswith("[dynamic]")) and
             not t.name.endswith(']')
         ):
-            return Odin_Type.SLICE
+            return Odin_Type.Slice
         
         if t.name.startswith("map["):
-            return Odin_Type.MAP
+            return Odin_Type.Map
 
-        return Odin_Type.STRUCT
+        return Odin_Type.Struct
 
     if t.type == lldb.eTypeClassArray:
-        return Odin_Type.ARRAY
+        return Odin_Type.Array
 
     if t.type == lldb.eTypeClassEnumeration:
-        return Odin_Type.ENUM
+        return Odin_Type.Enum
 
     if t.type == lldb.eTypeClassUnion:
         if t.name.startswith("bit_set["):
-            return Odin_Type.BITSET
+            return Odin_Type.Bitset
 
         tag = type_get_field_at(t, 0)
         if tag.IsValid() and tag.name == "tag":
-            return Odin_Type.UNION
+            return Odin_Type.Union
 
-        return Odin_Type.OTHER
+        return Odin_Type.Other
 
     if t.is_pointer:
-        return Odin_Type.PTR
+        return Odin_Type.Ptr
     
-    return Odin_Type.OTHER
+    return Odin_Type.Other
 
-def is_type_slice  (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.SLICE
-def is_type_string (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.STRING
-def is_type_map    (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.MAP
-def is_type_struct (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.STRUCT
-def is_type_pointer(t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.PTR
-def is_type_array  (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.ARRAY
-def is_type_enum   (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.ENUM
-def is_type_bitset (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.BITSET
-def is_type_union  (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.UNION
+def is_type_slice  (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.Slice
+def is_type_string (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.String
+def is_type_map    (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.Map
+def is_type_struct (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.Struct
+def is_type_pointer(t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.Ptr
+def is_type_array  (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.Array
+def is_type_enum   (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.Enum
+def is_type_bitset (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.Bitset
+def is_type_union  (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.Union
 
 def type_get_field_at(t: lldb.SBType, idx: int) -> lldb.SBTypeMember:
     return t.GetFieldAtIndex(idx)
