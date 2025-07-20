@@ -238,6 +238,21 @@ main :: proc () {
 	// (lldb) p flags_int
 	// (bit_set[main::Enum_Int]) {.One, .Two}
 
+	enum_array := [Enum]string{
+		.One   = "one",
+		.Two   = "two",
+		.Three = "three",
+	}
+	// Can't detect num array unfortunately
+
+	// (lldb) p enum_array
+	// ([main::Enum]string) [3]{"one", "two", "three"}
+
+	// (lldb) print_children enum_array
+	// [0] = "one"
+	// [1] = "two"
+	// [2] = "three"
+
 	breakpoint() // for lldb to breakpoint here
 	return
 }
