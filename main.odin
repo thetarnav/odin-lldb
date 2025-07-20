@@ -8,6 +8,8 @@ import "core:io"
 Enum     :: enum u8 {One, Two, Three}
 Enum_Int :: enum int {One, Two, Three}
 
+Bit_Set_Int :: bit_set[Enum_Int]
+
 Foo :: struct {foo_name: string, value: int}
 Bar :: struct {value: int, bar_name: string}
 
@@ -231,6 +233,10 @@ main :: proc () {
 	flags_max := transmute(bit_set[Enum])max(u8)
 	// (lldb) p flags_max
 	// (bit_set[main::Enum]) {.One, .Two, .Three}
+	
+	flags_int: Bit_Set_Int = {.One, .Two}
+	// (lldb) p flags_int
+	// (bit_set[main::Enum_Int]) {.One, .Two}
 
 	breakpoint() // for lldb to breakpoint here
 	return
