@@ -38,6 +38,7 @@ class Odin_Type(enum.Enum):
     ENUM    = "enum"
     BITSET  = "bitset"
     OTHER   = "other"
+    UNION   = "union"
 
 def get_odin_type(t: lldb.SBType) -> Odin_Type:
     
@@ -65,7 +66,11 @@ def get_odin_type(t: lldb.SBType) -> Odin_Type:
     if t.type == lldb.eTypeClassUnion:
         if t.name.startswith("bit_set["):
             return Odin_Type.BITSET
-        # Regular union types are handled elsewhere, not in get_odin_type
+
+        tag = type_get_field_at(t, 0)
+        if tag.IsValid() and tag.name == "tag":
+            return Odin_Type.UNION
+
         return Odin_Type.OTHER
 
     if t.is_pointer:
@@ -81,6 +86,7 @@ def is_type_pointer(t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == O
 def is_type_array  (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.ARRAY
 def is_type_enum   (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.ENUM
 def is_type_bitset (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.BITSET
+def is_type_union  (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.UNION
 
 def type_get_field_at(t: lldb.SBType, idx: int) -> lldb.SBTypeMember:
     return t.GetFieldAtIndex(idx)
@@ -455,13 +461,6 @@ class Cell_Info:
 #        v0:  T0
 #        v1:  T1
 #        ...
-
-def is_type_union  (t: lldb.SBType, _dict) -> bool:
-    if t.type == lldb.eTypeClassUnion:
-        tag = type_get_field_at(t, 0)
-        if tag.IsValid() and tag.name == "tag":
-            return True
-    return False
 
 def union_is_no_nil(t: lldb.SBType) -> bool:
     first = type_get_field_at(t, 1)
