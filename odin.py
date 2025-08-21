@@ -344,7 +344,7 @@ def string_summary(v: lldb.SBValue, _dict) -> str:
         return struct_summary(v, _dict)
 
     error = lldb.SBError()
-    string_data = v.process.ReadMemory(pointer, length, error)
+    string_data: bytes = v.process.ReadMemory(pointer, length, error)
     if not error.success:
         print(f"Error reading string data: {error}")
         return "<error reading string>"
@@ -664,6 +664,37 @@ def pointer_summary(ptr: lldb.SBValue, _dict) -> str:
             result += f" -> {return_type}"
 
         return result
+
+    # SOA slice pointer
+    if ptr.type.name.startswith("#soa"):
+
+        pointer = ptr.GetAddress().GetOffset()
+
+        error = lldb.SBError()
+        offset_bytes: bytes = ptr.process.ReadMemory(pointer+8, 8, error)
+        if not error.success:
+            print(f"Error reading string data: {error}")
+            return "<error reading string>"
+        else:
+            offset_int = int.from_bytes(offset_bytes, 'little')
+
+        v: lldb.SBValue = ptr.Dereference().GetNonSyntheticValue()
+
+        length = value_get_child(v, "__$len").signed
+
+        if offset_int < 0 or offset_int >= length:
+            return "<error: out of bounds>"
+
+        length_idx = v.GetIndexOfChildWithName("__$len")
+
+        fields: list[lldb.SBValue] = []
+        for field_i in range(length_idx): # only user fields
+            ptr = value_get_child_at(v, field_i)
+            pointee_type = ptr.type.GetPointeeType()
+            field = ptr.CreateChildAtOffset(f"[{offset_int}]", offset_int * pointee_type.size, pointee_type)
+            fields.append(field)
+
+        return aggregate_value_summary("#soa&{", "}", lambda i: value_summary(fields[i]), len(fields))
 
     # Regular pointer
     pointee: lldb.SBValue = ptr.Dereference()
