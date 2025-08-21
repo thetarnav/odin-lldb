@@ -254,6 +254,10 @@ main :: proc () {
 	// (lldb) p soa_dyn_array
 	// (#soa[dynamic]main::Foo) [3]{{"SOA1", 1}, {"SOA2", 2}, {"SOA3", 3}}
 
+	soa_slice := soa_dyn_array[:]
+	// (lldb) p soa_slice
+	// (#soa[]main::Foo) [3]{{"SOA1", 1}, {"SOA2", 2}, {"SOA3", 3}}
+
 	breakpoint() // for lldb to breakpoint here
 	return
 }
