@@ -123,7 +123,7 @@ main :: proc () {
 
 	// (lldb) p writer.procedure
 	// (io::Stream_Proc) nil
-	
+
 	// (lldb) p writer.data
 	// (void *) nil
 
@@ -207,20 +207,15 @@ main :: proc () {
 	// (lldb) p str_map
 	// (map[string]main::Foo) map[1]{"key1" = {"Value1", 1}}
 
+	// (lldb) print_children str_map
+	// key0 = "key1"
+	// ["key1"] = {"Value1", 1}
+	// len = 1
+	// cap = 8
+
 	str_map_empty: map[string]Foo = {}
 	// (lldb) p str_map_empty
 	// (map[string]main::Foo) map[0]{}
-
-	str_map_children: map[string]Foo = {"key1" = {"Value1", 1}, "key2" = {"Value2", 2}, "key3" = {"Value3", 3}}
-	// (lldb) print_children str_map_children
-	// key0 = "key1"
-	// ["key1"] = {"Value1", 1}
-	// key1 = "key2"
-	// ["key2"] = {"Value2", 2}
-	// key2 = "key3"
-	// ["key3"] = {"Value3", 3}
-	// len = 3
-	// cap = 8
 
 	flags: bit_set[Enum] = {.One, .Two}
 	// (lldb) p flags
@@ -233,7 +228,7 @@ main :: proc () {
 	flags_max := transmute(bit_set[Enum])max(u8)
 	// (lldb) p flags_max
 	// (bit_set[main::Enum]) {.One, .Two, .Three}
-	
+
 	flags_int: Bit_Set_Int = {.One, .Two}
 	// (lldb) p flags_int
 	// (bit_set[main::Enum_Int]) {.One, .Two}
@@ -243,7 +238,7 @@ main :: proc () {
 		.Two   = "two",
 		.Three = "three",
 	}
-	// Can't detect num array unfortunately
+	// Can't detect enum array unfortunately
 
 	// (lldb) p enum_array
 	// ([main::Enum]string) [3]{"one", "two", "three"}
@@ -252,6 +247,12 @@ main :: proc () {
 	// [0] = "one"
 	// [1] = "two"
 	// [2] = "three"
+
+	soa_dyn_array: #soa[dynamic]Foo
+	append(&soa_dyn_array, Foo{"SOA1", 1}, Foo{"SOA2", 2}, Foo{"SOA3", 3})
+
+	// (lldb) p soa_dyn_array
+	// (#soa[dynamic]main::Foo) [3]{{"SOA1", 1}, {"SOA2", 2}, {"SOA3", 3}}
 
 	breakpoint() // for lldb to breakpoint here
 	return

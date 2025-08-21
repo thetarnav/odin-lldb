@@ -26,6 +26,8 @@ def __lldb_init_module(debugger: lldb.SBDebugger, unused) -> None:
     debugger.HandleCommand("type summary add --python-function odin.map_summary                --recognizer-function odin.is_type_map")
     debugger.HandleCommand("type summary add --python-function odin.enum_summary    --no-value --recognizer-function odin.is_type_enum")
     debugger.HandleCommand("type summary add --python-function odin.bitset_summary  --no-value --recognizer-function odin.is_type_bitset")
+    # debugger.HandleCommand("type synth   add --python-class    odin.Soa_Dynamic_Array_Children_Provider --recognizer-function odin.is_type_soa_dynamic_array")
+    debugger.HandleCommand("type summary add --python-function odin.soa_dynamic_array_summary           --recognizer-function odin.is_type_soa_dynamic_array")
 
 
 class Odin_Type(enum.Enum):
@@ -37,6 +39,7 @@ class Odin_Type(enum.Enum):
     Ptr    = "pointer"
     Enum   = "enum"
     Bitset = "bitset"
+    SoaDynamicArray = "soa_dynamic_array"
     Other  = "other"
     Union  = "union"
 
@@ -51,6 +54,9 @@ def get_odin_type(t: lldb.SBType) -> Odin_Type:
             not t.name.endswith(']')
         ):
             return Odin_Type.Slice
+
+        if t.name.startswith("#soa[dynamic]") and not t.name.endswith(']'):
+            return Odin_Type.SoaDynamicArray
 
         if t.name.startswith("map["):
             return Odin_Type.Map
@@ -87,6 +93,7 @@ def is_type_array  (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == O
 def is_type_enum   (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.Enum
 def is_type_bitset (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.Bitset
 def is_type_union  (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.Union
+def is_type_soa_dynamic_array(t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.SoaDynamicArray
 
 def type_get_field_at(t: lldb.SBType, idx: int) -> lldb.SBTypeMember:
     return t.GetFieldAtIndex(idx)
@@ -263,6 +270,37 @@ class Slice_Children_Provider(lldb.SBSyntheticValueProvider):
             type        = pointee.type
 
         return self.data.CreateChildAtOffset(name, offset, type)
+
+
+# ------------------------------------------------------------------------------
+# SOA Dynamic Array Values
+#
+# Layout:
+#   struct {
+#       field_1:   [^]Field_1,
+#       field_2:   [^]Field_2,
+#       field_3:   [^]Field_3,
+#       ...
+#       __$len:    int,
+#       __$cap:    int,
+#       allocator: ^runtime.Allocator,
+#   }
+
+def soa_dynamic_array_summary(v: lldb.SBValue, _dict) -> str:
+    length = value_get_child(v.GetNonSyntheticValue(), "__$len").signed
+    type: lldb.SBType = v.type
+
+    def get_soa_value(i: int) -> str:
+        fields: list[lldb.SBValue] = []
+        for field_i in range(type.GetNumberOfFields()-3): # only user fields
+            ptr = value_get_child_at(v.GetNonSyntheticValue(), field_i)
+            pointee_type = ptr.type.GetPointeeType()
+            field = ptr.CreateChildAtOffset(f"[{i}]", i * pointee_type.size, pointee_type)
+            fields.append(field)
+
+        return aggregate_value_summary("{", "}", lambda i: value_summary(fields[i]), len(fields))
+
+    return aggregate_value_summary(f"[{length}]{{", "}", get_soa_value, length)
 
 
 # ------------------------------------------------------------------------------
