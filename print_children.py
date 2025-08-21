@@ -14,11 +14,11 @@ def print_children(
 
     frame = debugger.GetSelectedTarget().GetProcess().GetSelectedThread().GetSelectedFrame()
     variable = frame.FindVariable(var_name)
-    
+
     if not variable.IsValid():
         result.AppendMessage(f"Variable '{var_name}' not found")
         return
-    
+
     num_children = variable.GetNumChildren()
     if num_children == 0:
         result.AppendMessage("  No children")

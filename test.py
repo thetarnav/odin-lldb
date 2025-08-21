@@ -50,8 +50,8 @@ def run_build_script() -> bool:
     print_line("build.sh")
     try:
         # Run without capturing output so it shows in real-time
-        subprocess.run(['bash', 'build.sh'], 
-                       text=True, 
+        subprocess.run(['bash', 'build.sh'],
+                       text=True,
                        check=True)
         print_line("success", color=ANSI.GREEN)
         return True
@@ -62,12 +62,12 @@ def run_build_script() -> bool:
 
 def parse_test_cases(filename: str) -> List[TestCase]:
     print(info(f"Parsing test cases from {filename}..."))
-    
+
     test_cases: List[TestCase] = []
-    
+
     with open(filename, 'r') as f:
         content = f.read()
-    
+
     # Pattern to match:
     # // (lldb) command
     # // expected_output
@@ -75,19 +75,19 @@ def parse_test_cases(filename: str) -> List[TestCase]:
     test_cases: List[TestCase] = []
     lines = content.split('\n')
     line_i = 0
-    
+
     while line_i < len(lines):
         line = lines[line_i].strip()
-        
+
         # Look for "// (lldb) command" lines
         if line.startswith('//'):
             lldb_pos = line.find('(lldb)')
             if lldb_pos != -1:
                 command = line[lldb_pos + 6:].strip()
-                
+
                 expected_lines = []
                 line_i += 1
-                
+
                 while line_i < len(lines):
                     next_line = lines[line_i].strip()
 
@@ -99,14 +99,14 @@ def parse_test_cases(filename: str) -> List[TestCase]:
                     if '(lldb)' in next_line:
                         line_i -= 1  # step back to reprocess this line
                         break
-                    
+
                     expected_lines.append(next_line[2:].strip())
                     line_i += 1
-                
+
                 if expected_lines:
                     expected = '\n'.join(expected_lines)
                     test_cases.append(TestCase(command, expected))
-        
+
         line_i += 1
 
     print(success(f"Found {len(test_cases)} test cases"))
@@ -158,16 +158,16 @@ def run_lldb(test_cases: List[TestCase]) -> str:
 
     print(info("Running LLDB session:\n"), " ".join(cmd))
     print_line("lldb")
-    
+
     timeout = 120
     process = None
-    
+
     try:
-        result = subprocess.run(cmd, 
-                                capture_output=True, 
-                                text=True, 
+        result = subprocess.run(cmd,
+                                capture_output=True,
+                                text=True,
                                 timeout=timeout)
-        
+
         if result.returncode != 0:
             print(error(f"LLDB exited with code {result.returncode}"))
             print(error(f"Stderr: {result.stderr}"))
@@ -179,21 +179,21 @@ def run_lldb(test_cases: List[TestCase]) -> str:
                                    text=True,
                                    bufsize=1,  # Line buffered
                                    universal_newlines=True)
-        
+
         output_lines = []
-        
+
         # Read output line by line and display it while capturing
         if process.stdout:
             for line in process.stdout:
                 print(line, end='')
                 output_lines.append(line)
-        
+
         return_code = process.wait(timeout=timeout)
         if return_code != 0:
             print(error(f"\nLLDB exited with code {return_code}"))
-        
+
         return ''.join(output_lines)
-    
+
     except subprocess.TimeoutExpired:
         if process:
             process.kill()
@@ -211,10 +211,10 @@ def parse_lldb_output(output: str, test_cases: List[TestCase]) -> dict[str, str 
     results: dict[str, str | None] = {}
 
     start_from = 0
-    
+
     for test_case in test_cases:
         start_marker = f"(lldb) {test_case.command}\n"
-        
+
         start_idx = output.find(start_marker, start_from) + len(start_marker)
         end_idx   = output.find("\n(lldb) ", start_idx)
 
@@ -223,10 +223,10 @@ def parse_lldb_output(output: str, test_cases: List[TestCase]) -> dict[str, str 
             continue
 
         start_from = end_idx+1
-        
+
         test_output = output[start_idx:end_idx].strip()
         results[test_case.command] = test_output
-    
+
     return results
 
 
@@ -235,7 +235,7 @@ def run_test_case(test_case: TestCase, actual_output: Optional[str]) -> bool:
     if actual_output is None:
         print(error(f"  FAIL: {test_case.command} - No output captured"))
         return False
-    
+
     if compare_outputs(test_case.expected, actual_output):
         print(success(f"  PASS: {test_case.command}"))
         return True
@@ -252,44 +252,44 @@ def check_dependencies() -> bool:
         (["lldb", "--version"], "LLDB debugger not found. Please install LLDB.\nOn Ubuntu: sudo apt-get install lldb"),
         (["bash", "--version"], "Bash shell not found.")
     ]
-    
+
     for cmd, error_msg in required_checks:
         try:
-            subprocess.run(cmd, 
-                           capture_output=True, 
+            subprocess.run(cmd,
+                           capture_output=True,
                            check=True)
         except (subprocess.CalledProcessError, FileNotFoundError):
             print(error(f"Error: {error_msg}"))
             return False
-    
+
     return True
 
 
 def run_tests() -> bool:
     print(highlight("Starting LLDB Odin tests..."))
-    
+
     # Check dependencies first
     if not check_dependencies():
         print(error("Dependency check failed, aborting tests"))
         return False
-    
+
     if not run_build_script():
         print(error("Build failed, aborting tests"))
         return False
-    
+
     test_cases = parse_test_cases("main.odin")
     if not test_cases:
         print(warning("No test cases found"))
         return False
-    
+
     lldb_output = run_lldb(test_cases)
-    
+
     print_line("end")
-    
+
     results = parse_lldb_output(lldb_output, test_cases)
-    
+
     failed = 0
-    
+
     for test_case in test_cases:
         actual_output = results.get(test_case.command)
         if not run_test_case(test_case, actual_output):

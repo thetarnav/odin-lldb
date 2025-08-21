@@ -31,7 +31,7 @@ def __lldb_init_module(debugger: lldb.SBDebugger, unused) -> None:
 class Odin_Type(enum.Enum):
     Slice  = "slice"
     Array  = "array"
-    String = "string" 
+    String = "string"
     Map    = "map"
     Struct = "struct"
     Ptr    = "pointer"
@@ -41,17 +41,17 @@ class Odin_Type(enum.Enum):
     Union  = "union"
 
 def get_odin_type(t: lldb.SBType) -> Odin_Type:
-    
+
     if t.type == lldb.eTypeClassStruct:
         if t.name == "string":
             return Odin_Type.String
-        
+
         if (
             (t.name.startswith("[]") or t.name.startswith("[dynamic]")) and
             not t.name.endswith(']')
         ):
             return Odin_Type.Slice
-        
+
         if t.name.startswith("map["):
             return Odin_Type.Map
 
@@ -75,7 +75,7 @@ def get_odin_type(t: lldb.SBType) -> Odin_Type:
 
     if t.is_pointer:
         return Odin_Type.Ptr
-    
+
     return Odin_Type.Other
 
 def is_type_slice  (t: lldb.SBType, _dict) -> bool: return get_odin_type(t) == Odin_Type.Slice
@@ -124,10 +124,10 @@ def aggregate_value_summary(
     length:    int,
 ) -> str:
     summary = prefix
-    
+
     for i in range(length):
         item = get_value(i)
-        
+
         separator = ", " if i > 0 else ""
         new_length = len(summary) + len(separator) + len(item) + len(suffix)
 
@@ -166,7 +166,7 @@ def enum_summary(v: lldb.SBValue, _dict) -> str:
         member = members[num]
         if member and member.IsValid() and member.name:
             return f".{member.name}"
-    
+
     return str(num)
 
 
@@ -183,21 +183,21 @@ def bitset_summary(v: lldb.SBValue, _dict) -> str:
             field_value = v.GetChildMemberWithName(field.name)
             if field_value.IsValid() and field_value.GetValueAsUnsigned() != 0:
                 set_flags.append(f".{field.name}")
-    
+
     return "{" + ", ".join(set_flags) + "}"
 
 
 # ------------------------------------------------------------------------------
 # Slice Values
-# 
+#
 # handles both slices and dynamic arrays
 # since the layout is the same:
-# 
+#
 #    Raw_Slice :: struct($T: typeid) {
 #        data: [^]T,
 #        len:  int,
 #    }
-# 
+#
 #    Raw_Dynamic_Array :: struct($T: typeid) {
 #        data:      [^]T,
 #        len:       int,
@@ -281,13 +281,13 @@ def array_summary(v: lldb.SBValue, _dict) -> str:
 
 # ------------------------------------------------------------------------------
 # String Values
-# 
+#
 # Same layout as a slice,
 #    Raw_String :: struct {
 #        data: [^]u8,
 #        len:  int,
 #    }
-# 
+#
 # Odin strings are UTF-8 encoded
 
 def string_summary(v: lldb.SBValue, _dict) -> str:
@@ -357,7 +357,7 @@ class Map_Children_Provider:
     def get_child_at_index(self, index):
 
         error = lldb.SBError()
-        
+
         # Second to last one: length
         if index == self.num_children()-2:
             int_type = value_get_child(self.val, "len").type
@@ -369,7 +369,7 @@ class Map_Children_Provider:
             int_type = value_get_child(self.val, "len").type
             cap_data = lldb.SBData.CreateDataFromInt(self.cap, int_type.GetByteSize())
             return self.val.CreateValueFromData("cap", cap_data, int_type)
-        
+
         entry_idx = index // 2
         wants_key = index % 2 == 0
 
@@ -474,12 +474,12 @@ def union_variant(v: lldb.SBValue) -> lldb.SBValue | None:
     assert(tag.name == "tag")
 
     tag_value = tag.unsigned
-    
+
     is_no_nil = union_is_no_nil(v.type)
 
     if not is_no_nil and tag_value == 0:
         return None
-    
+
     return v.GetChildMemberWithName(f"v{tag_value}")
 
 def union_summary(v: lldb.SBValue, _dict) -> str:
@@ -504,7 +504,7 @@ class Union_Children_Provider(lldb.SBSyntheticValueProvider):
 
     def get_child_at_index(self, idx) -> lldb.SBValue | None:
         return self.variant.GetChildAtIndex(idx) if self.variant else None
-    
+
     def get_child_index(self, name) -> None | int:
         return self.variant.GetIndexOfChildWithName(name) if self.variant else None
 
@@ -517,7 +517,7 @@ def correct_proc_type_display(t: lldb.SBType) -> str:
     # The type name already contains most of what we need
     # e.g., "proc(f:^main::Foo,b:main::Bar)->(ok:bool)"
     # We need to convert it to: "proc (^main.Foo, main.Bar) -> bool"
-    
+
     # Extract calling convention if present
     convention = ""
     if '"' in type_name:
@@ -526,18 +526,18 @@ def correct_proc_type_display(t: lldb.SBType) -> str:
         conv_end = type_name.find('"', conv_start + 1)
         if conv_start != -1 and conv_end != -1:
             convention = type_name[conv_start:conv_end+1]
-    
+
     # Parse parameters and return types
     # Find the parameter list
     param_start = type_name.find('(')
     param_end = type_name.find(')')
     return_start = type_name.find('->')
-    
+
     if param_start == -1 or param_end == -1:
         return f"proc {convention} <invalid>"
-    
+
     params_str = type_name[param_start+1:param_end]
-    
+
     # Parse parameters - split by comma but handle nested types
     params = []
     if params_str:
@@ -550,7 +550,7 @@ def correct_proc_type_display(t: lldb.SBType) -> str:
                 # Convert :: to .
                 param_type = param_type.replace('::', '.')
                 params.append(param_type)
-    
+
     # Parse return type
     return_type = ""
     if return_start != -1:
@@ -575,17 +575,17 @@ def correct_proc_type_display(t: lldb.SBType) -> str:
             if ':' in return_part:
                 return_type = return_part.split(':', 1)[1].strip()
                 return_type = return_type.replace('::', '.')
-    
+
     # Build the final string
     params_formatted = ', '.join(params)
     if convention:
         result = f"proc {convention} ({params_formatted})"
     else:
         result = f"proc ({params_formatted})"
-    
+
     if return_type:
         result += f" -> {return_type}"
-    
+
     return result.replace('  ', ' ').strip()  # Clean up extra spaces
 
 def pointer_summary(ptr: lldb.SBValue, _dict) -> str:
@@ -593,40 +593,40 @@ def pointer_summary(ptr: lldb.SBValue, _dict) -> str:
     # nil pointer
     if ptr.GetValueAsUnsigned() == 0:
         return "nil"
-    
+
     # raw pointer
     if ptr.type.name == "void *":
         return f"rawptr({ptr.GetValue()})"
-    
+
     # proc pointer
     pointee_type: lldb.SBType = ptr.type.GetPointeeType()
     if pointee_type.type == lldb.eTypeClassFunction:
-        
+
         params = []
         return_type = None
-        
+
         return_type_obj = pointee_type.GetFunctionReturnType()
         if return_type_obj.IsValid():
             return_type = type_display(return_type_obj)
-        
+
         for param_type in pointee_type.GetFunctionArgumentTypes():
             if param_type.IsValid():
                 param_type_str = type_display(param_type)
                 params.append(param_type_str)
-        
+
         params_str = ', '.join(params)
         result = f'proc "c" ({params_str})'
-        
+
         if return_type and return_type != "void":
             result += f" -> {return_type}"
-        
+
         return result
 
     # Regular pointer
     pointee: lldb.SBValue = ptr.Dereference()
     if not pointee.IsValid():
         return type_display(ptr.type)
-    
+
     pointee_summary = pointee.GetSummary()
     if pointee_summary:
         return f"&{pointee_summary}"
